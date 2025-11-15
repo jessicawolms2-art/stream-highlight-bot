@@ -4,8 +4,10 @@ import ParametersConfig from "@/components/ParametersConfig";
 import ClipsList from "@/components/ClipsList";
 import ActivityTimeline from "@/components/ActivityTimeline";
 import StatsOverview from "@/components/StatsOverview";
+import VideoPlayer from "@/components/VideoPlayer";
 import { Scissors } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const { toast } = useToast();
@@ -13,6 +15,8 @@ const Index = () => {
   const [messageThreshold, setMessageThreshold] = useState(80);
   const [clipDuration, setClipDuration] = useState(30);
   const [sensitivity, setSensitivity] = useState(2);
+  const [currentVideo, setCurrentVideo] = useState<any>(null);
+  const [selectedClip, setSelectedClip] = useState<any>(null);
   
   // Mock data - esto se reemplazará con datos reales del análisis
   const [clips, setClips] = useState<any[]>([]);
@@ -26,43 +30,71 @@ const Index = () => {
 
   const handleAnalyze = async (url: string) => {
     setIsAnalyzing(true);
+    setSelectedClip(null);
     toast({
       title: "Iniciando análisis",
-      description: "Procesando el stream...",
+      description: "Conectando con Twitch...",
     });
 
-    // Simulación de análisis - esto se reemplazará con lógica real
-    setTimeout(() => {
-      // Datos de ejemplo para demostración
-      const mockTimelineData = Array.from({ length: 50 }, (_, i) => ({
-        time: `${Math.floor(i / 2)}:${(i % 2) * 30}`,
-        messages: Math.floor(Math.random() * 150) + 20,
-      }));
-
-      const mockClips = mockTimelineData
-        .map((point, index) => ({
-          id: `clip-${index}`,
-          timestamp: point.time,
-          duration: clipDuration,
-          messageCount: point.messages,
-          peakMessages: point.messages,
-        }))
-        .filter((clip) => clip.messageCount >= messageThreshold)
-        .slice(0, 8);
-
-      setTimelineData(mockTimelineData);
-      setClips(mockClips);
-      setStats({
-        totalMessages: 45320,
-        clipsGenerated: mockClips.length,
-        avgMessagesPerSecond: 42.3,
-        streamDuration: "2:15:30",
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-twitch', {
+        body: { 
+          videoUrl: url,
+          threshold: messageThreshold 
+        }
       });
 
-      setIsAnalyzing(false);
+      if (error) throw error;
+
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      console.log('Analysis result:', data);
+
+      setCurrentVideo(data.video);
+      setTimelineData(data.activityData);
+      setClips(data.clips);
+      setStats({
+        totalMessages: data.stats.totalMessages,
+        clipsGenerated: data.clips.length,
+        avgMessagesPerSecond: data.stats.avgMessagesPerSecond,
+        streamDuration: data.stats.duration,
+      });
+
       toast({
         title: "Análisis completado",
-        description: `Se detectaron ${mockClips.length} clips potenciales`,
+        description: `Se detectaron ${data.clips.length} clips potenciales`,
+      });
+    } catch (error) {
+      console.error('Error analyzing:', error);
+      toast({
+        title: "Error en el análisis",
+        description: error instanceof Error ? error.message : "No se pudo analizar el video",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handlePlayClip = (clip: any) => {
+    setSelectedClip(clip);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDownloadClip = async (clip: any) => {
+    toast({
+      title: "Preparando descarga",
+      description: `Generando clip de ${clip.duration}s...`,
+    });
+
+    // En producción, esto generaría el clip real
+    // Por ahora, simulamos la descarga
+    setTimeout(() => {
+      toast({
+        title: "Clip listo",
+        description: "El clip se descargará automáticamente",
       });
     }, 2000);
   };
@@ -90,6 +122,19 @@ const Index = () => {
           <UrlInput onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} />
         </div>
 
+        {/* Video Player */}
+        {(currentVideo || selectedClip) && (
+          <div className="mb-8">
+            <VideoPlayer
+              videoUrl={currentVideo?.url || ""}
+              clipStart={selectedClip?.startTime}
+              clipDuration={selectedClip?.duration}
+              title={selectedClip ? `Clip en ${selectedClip.timestamp}` : currentVideo?.title}
+              onDownload={selectedClip ? () => handleDownloadClip(selectedClip) : undefined}
+            />
+          </div>
+        )}
+
         {/* Stats Overview */}
         {clips.length > 0 && (
           <div className="mb-8">
@@ -114,7 +159,11 @@ const Index = () => {
           {/* Right Column: Timeline and Clips */}
           <div className="lg:col-span-2 space-y-6">
             <ActivityTimeline data={timelineData} threshold={messageThreshold} />
-            <ClipsList clips={clips} />
+            <ClipsList 
+              clips={clips} 
+              onPlayClip={handlePlayClip}
+              onDownloadClip={handleDownloadClip}
+            />
           </div>
         </div>
       </div>

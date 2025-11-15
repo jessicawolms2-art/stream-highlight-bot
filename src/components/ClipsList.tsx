@@ -6,6 +6,8 @@ import { Clock, MessageSquare, Download, Play } from "lucide-react";
 interface Clip {
   id: string;
   timestamp: string;
+  timestampSeconds: number;
+  startTime: number;
   duration: number;
   messageCount: number;
   peakMessages: number;
@@ -13,9 +15,11 @@ interface Clip {
 
 interface ClipsListProps {
   clips: Clip[];
+  onPlayClip: (clip: Clip) => void;
+  onDownloadClip: (clip: Clip) => void;
 }
 
-const ClipsList = ({ clips }: ClipsListProps) => {
+const ClipsList = ({ clips, onPlayClip, onDownloadClip }: ClipsListProps) => {
   return (
     <Card className="p-6 bg-card border-border shadow-card">
       <div className="flex items-center justify-between mb-6">
@@ -36,10 +40,11 @@ const ClipsList = ({ clips }: ClipsListProps) => {
           clips.map((clip) => (
             <div
               key={clip.id}
-              className="flex items-center justify-between p-4 rounded-lg bg-secondary border border-border hover:border-primary transition-colors group"
+              className="flex items-center justify-between p-4 rounded-lg bg-secondary border border-border hover:border-primary transition-colors group cursor-pointer"
+              onClick={() => onPlayClip(clip)}
             >
               <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-lg bg-gradient-primary flex items-center justify-center">
+                <div className="h-12 w-12 rounded-lg bg-gradient-primary flex items-center justify-center group-hover:scale-110 transition-transform">
                   <Play className="h-6 w-6 text-primary-foreground" />
                 </div>
                 <div>
@@ -63,6 +68,10 @@ const ClipsList = ({ clips }: ClipsListProps) => {
               <Button
                 size="sm"
                 variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDownloadClip(clip);
+                }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <Download className="h-4 w-4 mr-2" />
