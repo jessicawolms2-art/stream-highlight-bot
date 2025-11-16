@@ -50,12 +50,51 @@ serve(async (req) => {
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
-    // Extract video ID from URL
+    // Extract video ID or channel name from URL
+    let videoId: string;
     const videoIdMatch = videoUrl.match(/videos\/(\d+)/);
-    if (!videoIdMatch) {
-      throw new Error('Invalid Twitch video URL');
+    const channelMatch = videoUrl.match(/twitch\.tv\/([^\/\?]+)/);
+    
+    if (videoIdMatch) {
+      // Direct VOD URL
+      videoId = videoIdMatch[1];
+    } else if (channelMatch) {
+      // Channel URL - get latest VOD
+      const channelName = channelMatch[1];
+      console.log('Fetching latest VOD for channel:', channelName);
+      
+      const userResponse = await fetch(`https://api.twitch.tv/helix/users?login=${channelName}`, {
+        headers: {
+          'Client-ID': TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
+      const userData = await userResponse.json();
+      if (!userData.data || userData.data.length === 0) {
+        throw new Error('Canal no encontrado');
+      }
+      
+      const userId = userData.data[0].id;
+      
+      // Get latest VOD
+      const videosResponse = await fetch(`https://api.twitch.tv/helix/videos?user_id=${userId}&first=1&type=archive`, {
+        headers: {
+          'Client-ID': TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
+      const videosData = await videosResponse.json();
+      if (!videosData.data || videosData.data.length === 0) {
+        throw new Error('No se encontraron VODs para este canal');
+      }
+      
+      videoId = videosData.data[0].id;
+      console.log('Latest VOD ID:', videoId);
+    } else {
+      throw new Error('URL inválida. Por favor ingresa una URL de Twitch válida (canal o VOD)');
     }
-    const videoId = videoIdMatch[1];
 
     // Get video info
     const videoResponse = await fetch(`https://api.twitch.tv/helix/videos?id=${videoId}`, {
