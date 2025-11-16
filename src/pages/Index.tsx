@@ -80,6 +80,7 @@ const Index = () => {
 
   const handlePlayClip = (clip: any) => {
     setSelectedClip(clip);
+    // Scroll to video player
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -126,7 +127,7 @@ const Index = () => {
         {(currentVideo || selectedClip) && (
           <div className="mb-8">
             <VideoPlayer
-              videoUrl={currentVideo?.url || ""}
+              videoId={currentVideo?.id || ""}
               clipStart={selectedClip?.startTime}
               clipDuration={selectedClip?.duration}
               title={selectedClip ? `Clip en ${selectedClip.timestamp}` : currentVideo?.title}
