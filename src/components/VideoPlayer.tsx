@@ -13,7 +13,9 @@ interface VideoPlayerProps {
 const VideoPlayer = ({ videoId, clipStart = 0, clipDuration, title, onDownload }: VideoPlayerProps) => {
   // Construir URL del iframe de Twitch con el timestamp
   const timeParam = clipStart > 0 ? `&time=${Math.floor(clipStart / 3600)}h${Math.floor((clipStart % 3600) / 60)}m${Math.floor(clipStart % 60)}s` : '';
-  const embedUrl = `https://player.twitch.tv/?video=${videoId}&parent=${window.location.hostname}&autoplay=false${timeParam}`;
+  const linkTimeParam = clipStart > 0 ? `?t=${Math.floor(clipStart / 3600)}h${Math.floor((clipStart % 3600) / 60)}m${Math.floor(clipStart % 60)}s` : '';
+  const parentHost = typeof window !== "undefined" && window.location.hostname ? window.location.hostname : "localhost";
+  const embedUrl = `https://player.twitch.tv/?video=${videoId}&parent=${parentHost}&parent=localhost&autoplay=false${timeParam}`;
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -45,6 +47,17 @@ const VideoPlayer = ({ videoId, clipStart = 0, clipDuration, title, onDownload }
           allowFullScreen
           title="Twitch Video Player"
         />
+        <div className="p-3 text-sm text-muted-foreground border-t border-border bg-muted/30">
+          ¿No se carga el reproductor o aparece en gris?
+          <a
+            href={`https://www.twitch.tv/videos/${videoId}${linkTimeParam}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-1 underline text-primary"
+          >
+            Abrir en Twitch
+          </a>
+        </div>
         
         {onDownload && (
           <div className="p-4 border-t border-border bg-muted/50">
