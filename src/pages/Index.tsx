@@ -85,19 +85,21 @@ const Index = () => {
   };
 
   const handleDownloadClip = async (clip: any) => {
-    toast({
-      title: "Preparando descarga",
-      description: `Generando clip de ${clip.duration}s...`,
-    });
+    const h = Math.floor(clip.startTime / 3600);
+    const m = Math.floor((clip.startTime % 3600) / 60);
+    const s = Math.floor(clip.startTime % 60);
+    const tParam = `${h > 0 ? `${h}h` : ""}${m}m${s}s`;
+    const vodUrl =
+      currentVideo?.url
+        ? `${currentVideo.url}${currentVideo.url.includes("?") ? "&" : "?"}t=${tParam}`
+        : `https://www.twitch.tv/videos/${currentVideo?.id}?t=${tParam}`;
 
-    // En producción, esto generaría el clip real
-    // Por ahora, simulamos la descarga
-    setTimeout(() => {
-      toast({
-        title: "Clip listo",
-        description: "El clip se descargará automáticamente",
-      });
-    }, 2000);
+    window.open(vodUrl, "_blank", "noopener");
+
+    toast({
+      title: "Abriendo clip",
+      description: "Te llevamos al VOD en la marca de tiempo del clip.",
+    });
   };
 
   return (
