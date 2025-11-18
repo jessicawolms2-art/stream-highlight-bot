@@ -182,6 +182,19 @@ function parseDuration(duration: string): number {
   return seconds;
 }
 
+function formatDuration(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  
+  if (hours > 0) {
+    return `${hours}h${minutes}m${seconds}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
 function simulateChatActivity(durationSeconds: number, baselineThreshold: number): ChatActivity[] {
   const data: ChatActivity[] = [];
   const pointsCount = Math.min(100, Math.floor(durationSeconds / 30)); // Un punto cada 30 segundos
@@ -270,7 +283,7 @@ async function analyzeKickVOD(videoUrl: string, threshold: number) {
       video: {
         id: videoId,
         title: title,
-        duration: Math.floor(duration),
+        duration: formatDuration(Math.floor(duration)),
         url: videoUrl,
         platform: 'kick',
         thumbnail: `https://images.kick.com/video/${videoId}/thumbnail.jpg`,
@@ -279,9 +292,10 @@ async function analyzeKickVOD(videoUrl: string, threshold: number) {
       clips,
       stats: {
         totalMessages: activityData.reduce((sum, d) => sum + d.messages, 0),
-        averageMessages: Math.floor(activityData.reduce((sum, d) => sum + d.messages, 0) / activityData.length),
-        peakMessages: Math.max(...activityData.map(d => d.messages)),
-        totalClips: clips.length,
+        avgMessagesPerSecond: Math.round(
+          activityData.reduce((sum, d) => sum + d.messages, 0) / activityData.length
+        ),
+        duration: formatDuration(Math.floor(duration)),
       },
     }),
     {
