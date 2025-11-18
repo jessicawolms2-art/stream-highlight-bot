@@ -25,7 +25,19 @@ serve(async (req) => {
 
   try {
     const { videoUrl, threshold = 80 } = await req.json();
-    console.log('Analyzing Twitch VOD:', videoUrl);
+    console.log('Analyzing VOD:', videoUrl);
+    
+    // Detectar plataforma
+    const isKick = videoUrl.includes('kick.com');
+    const isTwitch = videoUrl.includes('twitch.tv');
+    
+    if (!isKick && !isTwitch) {
+      throw new Error('URL no válida. Solo se aceptan links de Twitch o Kick');
+    }
+    
+    if (isKick) {
+      return await analyzeKickVOD(videoUrl, threshold);
+    }
 
     const TWITCH_CLIENT_ID = Deno.env.get('TWITCH_CLIENT_ID');
     const TWITCH_CLIENT_SECRET = Deno.env.get('TWITCH_CLIENT_SECRET');
@@ -221,4 +233,59 @@ function detectClips(activityData: ChatActivity[], threshold: number) {
   }
   
   return clips;
+}
+
+// Función para analizar VODs de Kick con simulación
+async function analyzeKickVOD(videoUrl: string, threshold: number) {
+  console.log('Analyzing Kick VOD with simulation');
+  
+  // Extraer video ID de Kick
+  // Formatos posibles:
+  // https://kick.com/video/XXXXX
+  // https://kick.com/USERNAME?video=XXXXX
+  let videoId: string | null = null;
+  let title = 'Kick VOD';
+  let duration = 3600; // Default 1 hora si no podemos determinar
+  
+  const videoIdMatch = videoUrl.match(/video[\/=]([a-f0-9-]+)/i);
+  if (videoIdMatch) {
+    videoId = videoIdMatch[1];
+  } else {
+    // Si no encontramos ID, usar un ID genérico
+    videoId = 'kick-' + Date.now();
+  }
+  
+  // Como Kick no tiene API pública, simulamos con valores razonables
+  // Podríamos hacer un estimado basado en streams típicos (1-4 horas)
+  duration = 2 * 3600 + Math.random() * 2 * 3600; // Entre 2-4 horas
+  
+  console.log('Kick Video ID:', videoId, 'Estimated duration:', duration);
+  
+  // Simular actividad de chat
+  const activityData = simulateChatActivity(duration, threshold);
+  const clips = detectClips(activityData, threshold);
+  
+  return new Response(
+    JSON.stringify({
+      video: {
+        id: videoId,
+        title: title,
+        duration: Math.floor(duration),
+        url: videoUrl,
+        platform: 'kick',
+        thumbnail: `https://images.kick.com/video/${videoId}/thumbnail.jpg`,
+      },
+      activityData,
+      clips,
+      stats: {
+        totalMessages: activityData.reduce((sum, d) => sum + d.messages, 0),
+        averageMessages: Math.floor(activityData.reduce((sum, d) => sum + d.messages, 0) / activityData.length),
+        peakMessages: Math.max(...activityData.map(d => d.messages)),
+        totalClips: clips.length,
+      },
+    }),
+    {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    }
+  );
 }
