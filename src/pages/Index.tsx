@@ -31,9 +31,15 @@ const Index = () => {
   const handleAnalyze = async (url: string) => {
     setIsAnalyzing(true);
     setSelectedClip(null);
+    setCurrentVideo(null);
+    setTimelineData([]);
+    setClips([]);
+    
+    const platform = url.includes('kick.com') ? 'kick' : 'twitch';
+    
     toast({
       title: "Iniciando análisis",
-      description: "Conectando con Twitch...",
+      description: `Conectando con ${platform === 'kick' ? 'Kick' : 'Twitch'}...`,
     });
 
     try {
@@ -128,13 +134,15 @@ const Index = () => {
         {/* Video Player */}
         {(currentVideo || selectedClip) && (
           <div className="mb-8">
-            <VideoPlayer
-              videoId={currentVideo?.id || ""}
-              clipStart={selectedClip?.startTime}
-              clipDuration={selectedClip?.duration}
-              title={selectedClip ? `Clip en ${selectedClip.timestamp}` : currentVideo?.title}
-              onDownload={selectedClip ? () => handleDownloadClip(selectedClip) : undefined}
-            />
+          <VideoPlayer
+            videoId={currentVideo?.id || ""}
+            clipStart={selectedClip?.startTime}
+            clipDuration={selectedClip?.duration}
+            title={selectedClip ? `Clip en ${selectedClip.timestamp}` : currentVideo?.title}
+            onDownload={selectedClip ? () => handleDownloadClip(selectedClip) : undefined}
+            platform={currentVideo?.platform || 'twitch'}
+            videoUrl={currentVideo?.url}
+          />
           </div>
         )}
 
