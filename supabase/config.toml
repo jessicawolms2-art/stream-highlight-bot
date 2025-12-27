@@ -1,1 +1,7 @@
 project_id = "hgatupxazkpowyqcvgtp"
+
+[functions.analyze-twitch]
+verify_jwt = false
+
+[functions.get-top-clips]
+verify_jwt = false
