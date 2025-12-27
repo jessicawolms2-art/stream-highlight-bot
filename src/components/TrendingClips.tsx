@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TrendingClip {
@@ -16,24 +17,43 @@ interface TrendingClip {
   created_at: string;
   url: string;
   embed_url: string;
+  language?: string;
 }
+
+const LANGUAGES = [
+  { code: 'es', name: 'Español' },
+  { code: 'en', name: 'English' },
+  { code: 'pt', name: 'Português' },
+  { code: 'fr', name: 'Français' },
+  { code: 'de', name: 'Deutsch' },
+  { code: 'it', name: 'Italiano' },
+  { code: 'ru', name: 'Русский' },
+  { code: 'ko', name: '한국어' },
+  { code: 'ja', name: '日本語' },
+  { code: 'all', name: 'Todos los idiomas' },
+];
 
 const TrendingClips = () => {
   const [clips, setClips] = useState<TrendingClip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [language, setLanguage] = useState('es');
+  const [totalFound, setTotalFound] = useState(0);
 
-  const fetchTrendingClips = async () => {
+  const fetchTrendingClips = async (lang: string = language) => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const { data, error } = await supabase.functions.invoke('get-top-clips');
+      const { data, error } = await supabase.functions.invoke('get-top-clips', {
+        body: { language: lang, limit: 50 }
+      });
       
       if (error) throw error;
       if (data.error) throw new Error(data.error);
       
       setClips(data.clips || []);
+      setTotalFound(data.totalFound || 0);
     } catch (err) {
       console.error('Error fetching trending clips:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar clips');
@@ -45,6 +65,11 @@ const TrendingClips = () => {
   useEffect(() => {
     fetchTrendingClips();
   }, []);
+
+  const handleLanguageChange = (newLang: string) => {
+    setLanguage(newLang);
+    fetchTrendingClips(newLang);
+  };
 
   const formatViewCount = (count: number): string => {
     if (count >= 1000000) {
@@ -75,21 +100,39 @@ const TrendingClips = () => {
 
   return (
     <Card className="p-6 bg-card border-border shadow-card">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-2">
           <Flame className="h-5 w-5 text-accent" />
           <h3 className="text-lg font-semibold text-foreground">
             Clips Trending (24h)
           </h3>
+          {totalFound > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {totalFound} encontrados
+            </Badge>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          <Globe className="h-4 w-4 text-muted-foreground" />
+          <Select value={language} onValueChange={handleLanguageChange}>
+            <SelectTrigger className="w-[160px] h-9">
+              <SelectValue placeholder="Idioma" />
+            </SelectTrigger>
+            <SelectContent>
+              {LANGUAGES.map((lang) => (
+                <SelectItem key={lang.code} value={lang.code}>
+                  {lang.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Badge variant="outline" className="text-xs">
             Twitch
           </Badge>
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={fetchTrendingClips}
+            onClick={() => fetchTrendingClips()}
             disabled={isLoading}
             className="h-8 w-8"
           >
@@ -101,22 +144,23 @@ const TrendingClips = () => {
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-3 text-muted-foreground">Cargando clips trending...</span>
+          <span className="ml-3 text-muted-foreground">Cargando clips trending en {LANGUAGES.find(l => l.code === language)?.name}...</span>
         </div>
       ) : error ? (
         <div className="text-center py-12">
           <p className="text-destructive mb-4">{error}</p>
-          <Button variant="outline" onClick={fetchTrendingClips}>
+          <Button variant="outline" onClick={() => fetchTrendingClips()}>
             Reintentar
           </Button>
         </div>
       ) : clips.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Flame className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p>No se encontraron clips trending</p>
+          <p>No se encontraron clips en {LANGUAGES.find(l => l.code === language)?.name}</p>
+          <p className="text-sm mt-2">Prueba con otro idioma</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[600px] overflow-y-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[700px] overflow-y-auto pr-2">
           {clips.map((clip, index) => (
             <a
               key={clip.id}
