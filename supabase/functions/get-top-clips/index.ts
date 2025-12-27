@@ -12,7 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const { language = 'es', limit = 50 } = await req.json().catch(() => ({}));
+    const { language = 'es', limit = 20, cursor, gameId } = await req.json().catch(() => ({}));
+    
+    console.log(`Fetching clips - language: ${language}, limit: ${limit}, cursor: ${cursor}, gameId: ${gameId}`);
     
     const TWITCH_CLIENT_ID = Deno.env.get('TWITCH_CLIENT_ID');
     const TWITCH_CLIENT_SECRET = Deno.env.get('TWITCH_CLIENT_SECRET');
@@ -45,10 +47,10 @@ serve(async (req) => {
     const startedAt = new Date();
     startedAt.setHours(startedAt.getHours() - 24);
 
-    // Get top games
+    // Get top games for the filter dropdown
     console.log('Fetching top games...');
     const gamesResponse = await fetch(
-      'https://api.twitch.tv/helix/games/top?first=20',
+      'https://api.twitch.tv/helix/games/top?first=50',
       {
         headers: {
           'Client-ID': TWITCH_CLIENT_ID,
@@ -58,26 +60,32 @@ serve(async (req) => {
     );
     
     const gamesData = await gamesResponse.json();
-    console.log('Found games:', gamesData.data?.length);
+    const topGames = gamesData.data || [];
+    console.log('Found games:', topGames.length);
+    
+    // Determine which games to fetch clips from
+    const gamesToFetch = gameId 
+      ? [{ id: gameId, name: topGames.find((g: any) => g.id === gameId)?.name || 'Unknown' }]
+      : topGames.slice(0, 20);
     
     const allClips: any[] = [];
     const broadcasterIds = new Set<string>();
     const seenClipIds = new Set<string>();
     const MAX_PAGES_PER_GAME = 100;
     
-    // Get clips from each top game with pagination (up to 100 pages per game)
-    for (const game of gamesData.data || []) {
-      let cursor: string | undefined;
+    // Get clips from each game with pagination (up to 100 pages per game)
+    for (const game of gamesToFetch) {
+      let gameCursor: string | undefined;
       let pageCount = 0;
       
       try {
         while (pageCount < MAX_PAGES_PER_GAME) {
           const url = new URL('https://api.twitch.tv/helix/clips');
           url.searchParams.set('game_id', game.id);
-          url.searchParams.set('first', '100'); // Max per request
+          url.searchParams.set('first', '100');
           url.searchParams.set('started_at', startedAt.toISOString());
-          if (cursor) {
-            url.searchParams.set('after', cursor);
+          if (gameCursor) {
+            url.searchParams.set('after', gameCursor);
           }
           
           const gameClipsResponse = await fetch(url.toString(), {
@@ -105,10 +113,9 @@ serve(async (req) => {
           }
           
           pageCount++;
-          cursor = gameClipsData.pagination?.cursor;
+          gameCursor = gameClipsData.pagination?.cursor;
           
-          // If no more pages, break
-          if (!cursor) {
+          if (!gameCursor) {
             break;
           }
           
@@ -126,7 +133,7 @@ serve(async (req) => {
     const broadcasterIdsArray = Array.from(broadcasterIds);
     const broadcasterLanguages: Record<string, string> = {};
     
-    // Fetch broadcaster info in batches of 100 using correct parameter
+    // Fetch broadcaster info in batches of 100
     for (let i = 0; i < broadcasterIdsArray.length; i += 100) {
       const batch = broadcasterIdsArray.slice(i, i + 100);
       const idsParam = batch.map(id => `broadcaster_id=${id}`).join('&');
@@ -155,12 +162,11 @@ serve(async (req) => {
     console.log('Broadcaster languages fetched');
     console.log('Sample languages:', Object.values(broadcasterLanguages).slice(0, 10));
     
-    // Filter clips by language - Spanish includes 'es' and 'es-ES', 'es-MX', etc.
+    // Filter clips by language
     const filteredClips = allClips.filter(clip => {
       const lang = broadcasterLanguages[clip.broadcaster_id];
       if (language === 'all') return true;
       if (language === 'es') {
-        // Match Spanish variants: es, es-ES, es-MX, etc.
         return lang && (lang === 'es' || lang.startsWith('es-') || lang === 'spanish');
       }
       return lang === language;
@@ -168,11 +174,16 @@ serve(async (req) => {
     
     console.log(`Clips in ${language}:`, filteredClips.length);
     
-    // Sort by view count and take top clips
+    // Sort by view count
     filteredClips.sort((a, b) => b.view_count - a.view_count);
-    const topClips = filteredClips.slice(0, limit);
     
-    const formattedClips = topClips.map((clip: any) => ({
+    // Parse cursor for pagination (cursor is the start index)
+    const startIndex = cursor ? parseInt(cursor, 10) : 0;
+    const endIndex = startIndex + limit;
+    const paginatedClips = filteredClips.slice(startIndex, endIndex);
+    const nextCursor = endIndex < filteredClips.length ? endIndex.toString() : null;
+    
+    const formattedClips = paginatedClips.map((clip: any) => ({
       id: clip.id,
       title: clip.title,
       broadcaster_name: clip.broadcaster_name,
@@ -190,8 +201,10 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         clips: formattedClips,
+        games: topGames.map((g: any) => ({ id: g.id, name: g.name })),
         totalFound: filteredClips.length,
-        language: language,
+        nextCursor,
+        language,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
