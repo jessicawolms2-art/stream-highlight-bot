@@ -52,22 +52,23 @@ const TrendingClips = () => {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchTrendingClips = useCallback(async (reset = true) => {
+  const fetchTrendingClips = async (reset = true, cursorOverride?: string | null) => {
     if (reset) {
       setIsLoading(true);
       setClips([]);
-      setNextCursor(null);
     } else {
       setIsLoadingMore(true);
     }
     setError(null);
+    
+    const cursorToUse = reset ? undefined : cursorOverride;
     
     try {
       const { data, error } = await supabase.functions.invoke('get-top-clips', {
         body: { 
           language, 
           limit: 20,
-          cursor: reset ? undefined : nextCursor,
+          cursor: cursorToUse,
           gameId: gameId === 'all' ? undefined : gameId,
         }
       });
@@ -83,7 +84,7 @@ const TrendingClips = () => {
       }
       
       setTotalFound(data.totalFound || 0);
-      setNextCursor(data.nextCursor);
+      setNextCursor(data.nextCursor || null);
     } catch (err) {
       console.error('Error fetching trending clips:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar clips');
@@ -91,11 +92,17 @@ const TrendingClips = () => {
       setIsLoading(false);
       setIsLoadingMore(false);
     }
-  }, [language, gameId, nextCursor]);
+  };
 
   useEffect(() => {
     fetchTrendingClips(true);
   }, [language, gameId]);
+
+  const loadMore = useCallback(() => {
+    if (nextCursor && !isLoadingMore && !isLoading) {
+      fetchTrendingClips(false, nextCursor);
+    }
+  }, [nextCursor, isLoadingMore, isLoading, language, gameId]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -105,8 +112,8 @@ const TrendingClips = () => {
 
     observerRef.current = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && nextCursor && !isLoadingMore && !isLoading) {
-          fetchTrendingClips(false);
+        if (entries[0].isIntersecting) {
+          loadMore();
         }
       },
       { threshold: 0.1 }
@@ -121,7 +128,7 @@ const TrendingClips = () => {
         observerRef.current.disconnect();
       }
     };
-  }, [nextCursor, isLoadingMore, isLoading, fetchTrendingClips]);
+  }, [loadMore]);
 
   const handleLanguageChange = (newLang: string) => {
     setLanguage(newLang);
@@ -317,7 +324,7 @@ const TrendingClips = () => {
             {!isLoadingMore && nextCursor && (
               <Button
                 variant="outline"
-                onClick={() => fetchTrendingClips(false)}
+                onClick={loadMore}
               >
                 Cargar más clips
               </Button>
