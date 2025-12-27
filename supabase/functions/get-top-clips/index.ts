@@ -62,29 +62,57 @@ serve(async (req) => {
     
     const allClips: any[] = [];
     const broadcasterIds = new Set<string>();
+    const seenClipIds = new Set<string>();
+    const MAX_PAGES_PER_GAME = 100;
     
-    // Get clips from each top game
+    // Get clips from each top game with pagination (up to 100 pages per game)
     for (const game of gamesData.data || []) {
+      let cursor: string | undefined;
+      let pageCount = 0;
+      
       try {
-        const gameClipsResponse = await fetch(
-          `https://api.twitch.tv/helix/clips?game_id=${game.id}&first=50&started_at=${startedAt.toISOString()}`,
-          {
+        while (pageCount < MAX_PAGES_PER_GAME) {
+          const url = new URL('https://api.twitch.tv/helix/clips');
+          url.searchParams.set('game_id', game.id);
+          url.searchParams.set('first', '100'); // Max per request
+          url.searchParams.set('started_at', startedAt.toISOString());
+          if (cursor) {
+            url.searchParams.set('after', cursor);
+          }
+          
+          const gameClipsResponse = await fetch(url.toString(), {
             headers: {
               'Client-ID': TWITCH_CLIENT_ID,
               'Authorization': `Bearer ${accessToken}`,
             },
+          });
+          
+          const gameClipsData = await gameClipsResponse.json();
+          
+          if (!gameClipsData.data || gameClipsData.data.length === 0) {
+            break;
           }
-        );
-        
-        const gameClipsData = await gameClipsResponse.json();
-        if (gameClipsData.data) {
+          
           for (const clip of gameClipsData.data) {
-            allClips.push({
-              ...clip,
-              game_name: game.name,
-            });
-            broadcasterIds.add(clip.broadcaster_id);
+            if (!seenClipIds.has(clip.id)) {
+              seenClipIds.add(clip.id);
+              allClips.push({
+                ...clip,
+                game_name: game.name,
+              });
+              broadcasterIds.add(clip.broadcaster_id);
+            }
           }
+          
+          pageCount++;
+          cursor = gameClipsData.pagination?.cursor;
+          
+          // If no more pages, break
+          if (!cursor) {
+            break;
+          }
+          
+          console.log(`Game ${game.name}: page ${pageCount}, total clips: ${allClips.length}`);
         }
       } catch (e) {
         console.error(`Error fetching clips for game ${game.name}:`, e);
