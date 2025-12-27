@@ -5,6 +5,7 @@ import ClipsList from "@/components/ClipsList";
 import ActivityTimeline from "@/components/ActivityTimeline";
 import StatsOverview from "@/components/StatsOverview";
 import VideoPlayer from "@/components/VideoPlayer";
+import TrendingClips from "@/components/TrendingClips";
 import { Scissors } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -176,6 +177,11 @@ const Index = () => {
               onDownloadClip={handleDownloadClip}
             />
           </div>
+        </div>
+
+        {/* Trending Clips Section */}
+        <div className="mt-8">
+          <TrendingClips />
         </div>
       </div>
     </div>
