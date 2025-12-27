@@ -98,25 +98,12 @@ serve(async (req) => {
     const broadcasterIdsArray = Array.from(broadcasterIds);
     const broadcasterLanguages: Record<string, string> = {};
     
-    // Fetch broadcaster info in batches of 100
+    // Fetch broadcaster info in batches of 100 using correct parameter
     for (let i = 0; i < broadcasterIdsArray.length; i += 100) {
       const batch = broadcasterIdsArray.slice(i, i + 100);
-      const idsParam = batch.map(id => `id=${id}`).join('&');
+      const idsParam = batch.map(id => `broadcaster_id=${id}`).join('&');
       
       try {
-        const usersResponse = await fetch(
-          `https://api.twitch.tv/helix/users?${idsParam}`,
-          {
-            headers: {
-              'Client-ID': TWITCH_CLIENT_ID,
-              'Authorization': `Bearer ${accessToken}`,
-            },
-          }
-        );
-        
-        const usersData = await usersResponse.json();
-        
-        // Now get channels to get broadcaster language
         const channelsResponse = await fetch(
           `https://api.twitch.tv/helix/channels?${idsParam}`,
           {
@@ -138,11 +125,16 @@ serve(async (req) => {
     }
     
     console.log('Broadcaster languages fetched');
+    console.log('Sample languages:', Object.values(broadcasterLanguages).slice(0, 10));
     
-    // Filter clips by language
+    // Filter clips by language - Spanish includes 'es' and 'es-ES', 'es-MX', etc.
     const filteredClips = allClips.filter(clip => {
       const lang = broadcasterLanguages[clip.broadcaster_id];
       if (language === 'all') return true;
+      if (language === 'es') {
+        // Match Spanish variants: es, es-ES, es-MX, etc.
+        return lang && (lang === 'es' || lang.startsWith('es-') || lang === 'spanish');
+      }
       return lang === language;
     });
     
