@@ -63,15 +63,15 @@ serve(async (req) => {
     const topGames = gamesData.data || [];
     console.log('Found games:', topGames.length);
     
-    // Determine which games to fetch clips from
+    // Determine which games to fetch clips from - limit to 10 games and 5 pages each for faster response
     const gamesToFetch = gameId 
       ? [{ id: gameId, name: topGames.find((g: any) => g.id === gameId)?.name || 'Unknown' }]
-      : topGames.slice(0, 20);
+      : topGames.slice(0, 10);
     
     const allClips: any[] = [];
     const broadcasterIds = new Set<string>();
     const seenClipIds = new Set<string>();
-    const MAX_PAGES_PER_GAME = 100;
+    const MAX_PAGES_PER_GAME = gameId ? 20 : 5; // More pages when filtering by specific game
     
     // Get clips from each game with pagination (up to 100 pages per game)
     for (const game of gamesToFetch) {
