@@ -63,67 +63,102 @@ serve(async (req) => {
     const topGames = gamesData.data || [];
     console.log('Found games:', topGames.length);
     
-    // Determine which games to fetch clips from - limit to 10 games and 5 pages each for faster response
+    // Progressive fetching strategy to get more clips without timeout
+    // When filtering by gameId: fetch more pages for that specific game
+    // When fetching all: distribute requests across more games with fewer pages each
     const gamesToFetch = gameId 
       ? [{ id: gameId, name: topGames.find((g: any) => g.id === gameId)?.name || 'Unknown' }]
-      : topGames.slice(0, 10);
+      : topGames.slice(0, 25); // Fetch from 25 games
     
     const allClips: any[] = [];
     const broadcasterIds = new Set<string>();
     const seenClipIds = new Set<string>();
-    const MAX_PAGES_PER_GAME = gameId ? 20 : 5; // More pages when filtering by specific game
     
-    // Get clips from each game with pagination (up to 100 pages per game)
-    for (const game of gamesToFetch) {
-      let gameCursor: string | undefined;
-      let pageCount = 0;
-      
-      try {
-        while (pageCount < MAX_PAGES_PER_GAME) {
-          const url = new URL('https://api.twitch.tv/helix/clips');
-          url.searchParams.set('game_id', game.id);
-          url.searchParams.set('first', '100');
-          url.searchParams.set('started_at', startedAt.toISOString());
-          if (gameCursor) {
-            url.searchParams.set('after', gameCursor);
-          }
-          
-          const gameClipsResponse = await fetch(url.toString(), {
-            headers: {
-              'Client-ID': TWITCH_CLIENT_ID,
-              'Authorization': `Bearer ${accessToken}`,
-            },
-          });
-          
-          const gameClipsData = await gameClipsResponse.json();
-          
-          if (!gameClipsData.data || gameClipsData.data.length === 0) {
-            break;
-          }
-          
-          for (const clip of gameClipsData.data) {
-            if (!seenClipIds.has(clip.id)) {
-              seenClipIds.add(clip.id);
-              allClips.push({
-                ...clip,
-                game_name: game.name,
-              });
-              broadcasterIds.add(clip.broadcaster_id);
-            }
-          }
-          
-          pageCount++;
-          gameCursor = gameClipsData.pagination?.cursor;
-          
-          if (!gameCursor) {
-            break;
-          }
-          
-          console.log(`Game ${game.name}: page ${pageCount}, total clips: ${allClips.length}`);
-        }
-      } catch (e) {
-        console.error(`Error fetching clips for game ${game.name}:`, e);
+    // Time budget: we have ~25 seconds before timeout, aim to finish in ~20s
+    const startTime = Date.now();
+    const TIME_BUDGET_MS = 20000; // 20 seconds max
+    const MAX_PAGES_PER_GAME = gameId ? 15 : 3; // 15 pages for specific game, 3 for general
+    const MAX_TOTAL_CLIPS = 3000; // Stop if we have enough clips
+    
+    // Fetch clips from games in parallel batches for speed
+    const BATCH_SIZE = 5; // Process 5 games at a time
+    
+    for (let batchStart = 0; batchStart < gamesToFetch.length; batchStart += BATCH_SIZE) {
+      // Check time budget
+      if (Date.now() - startTime > TIME_BUDGET_MS) {
+        console.log('Time budget exceeded, stopping fetch');
+        break;
       }
+      
+      // Check clip limit
+      if (allClips.length >= MAX_TOTAL_CLIPS) {
+        console.log('Clip limit reached, stopping fetch');
+        break;
+      }
+      
+      const gameBatch = gamesToFetch.slice(batchStart, batchStart + BATCH_SIZE);
+      
+      // Fetch first page from all games in batch simultaneously
+      const batchPromises = gameBatch.map(async (game: { id: string; name: string }) => {
+        const gameClips: any[] = [];
+        let gameCursor: string | undefined;
+        let pageCount = 0;
+        
+        try {
+          while (pageCount < MAX_PAGES_PER_GAME) {
+            // Check time budget within game loop
+            if (Date.now() - startTime > TIME_BUDGET_MS) break;
+            
+            const url = new URL('https://api.twitch.tv/helix/clips');
+            url.searchParams.set('game_id', game.id);
+            url.searchParams.set('first', '100');
+            url.searchParams.set('started_at', startedAt.toISOString());
+            if (gameCursor) {
+              url.searchParams.set('after', gameCursor);
+            }
+            
+            const gameClipsResponse = await fetch(url.toString(), {
+              headers: {
+                'Client-ID': TWITCH_CLIENT_ID,
+                'Authorization': `Bearer ${accessToken}`,
+              },
+            });
+            
+            const gameClipsData = await gameClipsResponse.json();
+            
+            if (!gameClipsData.data || gameClipsData.data.length === 0) break;
+            
+            for (const clip of gameClipsData.data) {
+              gameClips.push({ ...clip, game_name: game.name });
+            }
+            
+            pageCount++;
+            gameCursor = gameClipsData.pagination?.cursor;
+            
+            if (!gameCursor) break;
+            
+            console.log(`Game ${game.name}: page ${pageCount}, clips: ${gameClips.length}`);
+          }
+        } catch (e) {
+          console.error(`Error fetching clips for game ${game.name}:`, e);
+        }
+        
+        return gameClips;
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      
+      for (const gameClips of batchResults) {
+        for (const clip of gameClips) {
+          if (!seenClipIds.has(clip.id)) {
+            seenClipIds.add(clip.id);
+            allClips.push(clip);
+            broadcasterIds.add(clip.broadcaster_id);
+          }
+        }
+      }
+      
+      console.log(`Batch complete, total clips: ${allClips.length}, time: ${Date.now() - startTime}ms`);
     }
     
     console.log('Total clips fetched:', allClips.length);
