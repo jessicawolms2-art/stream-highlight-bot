@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.get-top-clips]
 verify_jwt = false
+
+[functions.get-kick-clips]
+verify_jwt = false

@@ -6,6 +6,7 @@ import ActivityTimeline from "@/components/ActivityTimeline";
 import StatsOverview from "@/components/StatsOverview";
 import VideoPlayer from "@/components/VideoPlayer";
 import TrendingClips from "@/components/TrendingClips";
+import KickTrendingClips from "@/components/KickTrendingClips";
 import { Scissors } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -179,9 +180,10 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Trending Clips Section */}
-        <div className="mt-8">
+        {/* Trending Clips Sections */}
+        <div className="mt-8 space-y-8">
           <TrendingClips />
+          <KickTrendingClips />
         </div>
       </div>
     </div>
