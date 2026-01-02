@@ -7,6 +7,7 @@ import StatsOverview from "@/components/StatsOverview";
 import VideoPlayer from "@/components/VideoPlayer";
 import TrendingClips from "@/components/TrendingClips";
 import KickTrendingClips from "@/components/KickTrendingClips";
+import StreamerSearch from "@/components/StreamerSearch";
 import { Scissors } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -157,8 +158,8 @@ const Index = () => {
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Left Column: Parameters */}
-          <div className="lg:col-span-1">
+          {/* Left Column: Parameters + Streamer Search */}
+          <div className="lg:col-span-1 space-y-6">
             <ParametersConfig
               messageThreshold={messageThreshold}
               setMessageThreshold={setMessageThreshold}
@@ -167,6 +168,7 @@ const Index = () => {
               sensitivity={sensitivity}
               setSensitivity={setSensitivity}
             />
+            <StreamerSearch />
           </div>
 
           {/* Right Column: Timeline and Clips */}

@@ -41,13 +41,97 @@ serve(async (req) => {
   }
 
   try {
-    const { categorySlug, sortBy = 'view', timeFilter = 'week', limit = 20, cursor } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const { action, query, categorySlug, sortBy = 'view', timeFilter = 'week', limit = 20, cursor, language = 'es' } = body;
     
-    console.log(`Fetching Kick clips - category: ${categorySlug}, sort: ${sortBy}, time: ${timeFilter}, limit: ${limit}, cursor: ${cursor}`);
+    // Handle channel search
+    if (action === 'search_channels' && query) {
+      console.log(`Searching Kick channels for: ${query}`);
+      
+      try {
+        const searchUrl = `https://kick.com/api/v2/search?query=${encodeURIComponent(query)}`;
+        const searchResponse = await fetch(searchUrl, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        });
+        
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          const channels = (searchData.channels || []).map((ch: any) => ({
+            id: ch.id,
+            slug: ch.slug || ch.channel_slug,
+            username: ch.user?.username || ch.slug || query,
+            profile_pic: ch.user?.profile_pic || ch.profile_pic || '',
+            is_live: ch.livestream !== null,
+            viewer_count: ch.livestream?.viewer_count || 0,
+            category: ch.livestream?.categories?.[0]?.name || ch.recent_categories?.[0]?.name || '',
+          }));
+          
+          return new Response(
+            JSON.stringify({ success: true, channels }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        // Fallback: try direct channel lookup
+        const directUrl = `https://kick.com/api/v2/channels/${query.toLowerCase()}`;
+        const directResponse = await fetch(directUrl, {
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          },
+        });
+        
+        if (directResponse.ok) {
+          const ch = await directResponse.json();
+          const channels = [{
+            id: ch.id,
+            slug: ch.slug,
+            username: ch.user?.username || ch.slug,
+            profile_pic: ch.user?.profile_pic || '',
+            is_live: ch.livestream !== null,
+            viewer_count: ch.livestream?.viewer_count || 0,
+            category: ch.livestream?.categories?.[0]?.name || '',
+          }];
+          
+          return new Response(
+            JSON.stringify({ success: true, channels }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        return new Response(
+          JSON.stringify({ success: true, channels: [] }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (err) {
+        console.error('Error searching Kick channels:', err);
+        return new Response(
+          JSON.stringify({ success: false, channels: [], error: 'Search failed' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+    
+    console.log(`Fetching Kick clips - category: ${categorySlug}, sort: ${sortBy}, time: ${timeFilter}, limit: ${limit}, cursor: ${cursor}, language: ${language}`);
     
     const allClips: any[] = [];
     const seenClipIds = new Set<string>();
     const categoriesSet = new Map<string, string>();
+    
+    // Spanish streamer slugs to prioritize for Spanish content
+    const spanishStreamers = [
+      'auronplay', 'ibai', 'elxokas', 'illojuan', 'rubius', 'thegrefg', 
+      'juansguarnizo', 'rivers_gg', 'westcol', 'arigameplays', 'elmariana',
+      'fernanfloo', 'ded', 'roier', 'karmaland', 'quackity', 'vegetta777',
+      'alexby11', 'willyrex', 'ampeterby7', 'elded', 'gerardromero', 
+      'davidguapo', 'jordiWild', 'llados', 'cheeto', 'zeling', 'werlyb',
+      'knekro', 'reborn', 'mayichi', 'jaggerprincesa', 'carola', 'cristinini',
+      'silithur', 'byviruzz', 'paracetamor', 'zorman', 'mr.granbomba',
+      'elmillor', 'spreen', 'coscu', 'momo', 'frankkaster'
+    ];
     
     // Map time filter to Kick's format
     const getTimeParam = (filter: string): string => {
@@ -69,118 +153,101 @@ serve(async (req) => {
       }
     };
     
-    // Fetch clips from the general clips endpoint (which works without auth)
-    console.log('Fetching clips from general endpoint...');
+    // For Spanish content, fetch from Spanish streamers directly
+    if (language === 'es') {
+      console.log('Fetching clips from Spanish streamers...');
+      
+      // Fetch clips from multiple Spanish streamers in parallel
+      const streamerPromises = spanishStreamers.slice(0, 15).map(async (streamer) => {
+        try {
+          const clipsUrl = `https://kick.com/api/v2/channels/${streamer}/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}`;
+          console.log(`Fetching clips from ${streamer}`);
+          
+          const response = await fetch(clipsUrl, {
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            return data.clips || [];
+          }
+          return [];
+        } catch (e) {
+          console.error(`Error fetching clips from ${streamer}:`, e);
+          return [];
+        }
+      });
+      
+      const results = await Promise.all(streamerPromises);
+      
+      for (const clips of results) {
+        for (const clip of clips) {
+          const clipId = clip.id || clip.clip_id;
+          if (!seenClipIds.has(clipId)) {
+            seenClipIds.add(clipId);
+            allClips.push(clip);
+            
+            if (clip.category) {
+              categoriesSet.set(clip.category.slug, clip.category.name);
+            }
+          }
+        }
+      }
+      
+      console.log(`Fetched ${allClips.length} clips from Spanish streamers`);
+    }
     
-    // Fetch multiple pages to get more clips
-    const pagesToFetch = categorySlug ? 3 : 5;
-    
-    for (let page = 1; page <= pagesToFetch; page++) {
-      try {
-        const clipsUrl = categorySlug 
-          ? `https://kick.com/api/v2/categories/${categorySlug}/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}&page=${page}`
-          : `https://kick.com/api/v2/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}&page=${page}`;
-        
-        console.log(`Fetching page ${page}: ${clipsUrl}`);
-        
-        const clipsResponse = await fetch(clipsUrl, {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          },
-        });
-        
-        if (clipsResponse.ok) {
-          const clipsData = await clipsResponse.json();
-          const clips = clipsData.clips || clipsData.data || [];
+    // If we don't have enough Spanish clips, also fetch from general endpoint
+    if (allClips.length < 20) {
+      console.log('Fetching additional clips from general endpoint...');
+      
+      const pagesToFetch = categorySlug ? 3 : 5;
+      
+      for (let page = 1; page <= pagesToFetch; page++) {
+        try {
+          const clipsUrl = categorySlug 
+            ? `https://kick.com/api/v2/categories/${categorySlug}/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}&page=${page}`
+            : `https://kick.com/api/v2/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}&page=${page}`;
           
-          console.log(`Page ${page}: ${clips.length} clips`);
+          console.log(`Fetching page ${page}: ${clipsUrl}`);
           
-          if (clips.length === 0) break;
+          const clipsResponse = await fetch(clipsUrl, {
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+          });
           
-          for (const clip of clips) {
-            const clipId = clip.id || clip.clip_id;
-            if (!seenClipIds.has(clipId)) {
-              seenClipIds.add(clipId);
-              allClips.push(clip);
-              
-              // Extract category info
-              if (clip.category) {
-                categoriesSet.set(clip.category.slug, clip.category.name);
+          if (clipsResponse.ok) {
+            const clipsData = await clipsResponse.json();
+            const clips = clipsData.clips || clipsData.data || [];
+            
+            console.log(`Page ${page}: ${clips.length} clips`);
+            
+            if (clips.length === 0) break;
+            
+            for (const clip of clips) {
+              const clipId = clip.id || clip.clip_id;
+              if (!seenClipIds.has(clipId)) {
+                seenClipIds.add(clipId);
+                allClips.push(clip);
+                
+                if (clip.category) {
+                  categoriesSet.set(clip.category.slug, clip.category.name);
+                }
               }
             }
+          } else {
+            console.log(`Page ${page}: Response ${clipsResponse.status}`);
+            break;
           }
-        } else {
-          console.log(`Page ${page}: Response ${clipsResponse.status}`);
+        } catch (e) {
+          console.error(`Error fetching page ${page}:`, e);
           break;
         }
-      } catch (e) {
-        console.error(`Error fetching page ${page}:`, e);
-        break;
-      }
-    }
-    
-    // If no clips from category endpoint, try the general clips endpoint
-    if (allClips.length === 0) {
-      console.log('Trying general clips endpoint...');
-      try {
-        const generalClipsUrl = `https://kick.com/api/v2/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}&page=1`;
-        
-        const generalResponse = await fetch(generalClipsUrl, {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        });
-        
-        if (generalResponse.ok) {
-          const generalData = await generalResponse.json();
-          const clips = generalData.clips || generalData.data || [];
-          console.log('General endpoint clips:', clips.length);
-          
-          for (const clip of clips) {
-            const clipId = clip.id || clip.clip_id;
-            if (!seenClipIds.has(clipId)) {
-              seenClipIds.add(clipId);
-              allClips.push(clip);
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching general clips:', e);
-      }
-    }
-    
-    // If still no clips, try the private API endpoint
-    if (allClips.length === 0) {
-      console.log('Trying private API endpoint...');
-      try {
-        const privateClipsUrl = 'https://api.kick.com/private/v1/clips';
-        
-        const privateResponse = await fetch(privateClipsUrl, {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        });
-        
-        if (privateResponse.ok) {
-          const privateData = await privateResponse.json();
-          const clips = privateData.clips || privateData.data || [];
-          console.log('Private endpoint clips:', clips.length);
-          
-          for (const clip of clips) {
-            const clipId = clip.id || clip.clip_id;
-            if (!seenClipIds.has(clipId)) {
-              seenClipIds.add(clipId);
-              allClips.push(clip);
-            }
-          }
-        } else {
-          console.log('Private API response:', privateResponse.status);
-        }
-      } catch (e) {
-        console.error('Error fetching private clips:', e);
       }
     }
     
@@ -237,7 +304,7 @@ serve(async (req) => {
         totalFound: 0,
       }),
       {
-        status: 200, // Return 200 to prevent frontend errors
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

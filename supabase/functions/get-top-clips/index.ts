@@ -12,9 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { language = 'es', limit = 20, cursor, gameId } = await req.json().catch(() => ({}));
-    
-    console.log(`Fetching clips - language: ${language}, limit: ${limit}, cursor: ${cursor}, gameId: ${gameId}`);
+    const body = await req.json().catch(() => ({}));
+    const { action, query, language = 'es', limit = 20, cursor, gameId } = body;
     
     const TWITCH_CLIENT_ID = Deno.env.get('TWITCH_CLIENT_ID');
     const TWITCH_CLIENT_SECRET = Deno.env.get('TWITCH_CLIENT_SECRET');
@@ -43,6 +42,40 @@ serve(async (req) => {
     if (!accessToken) {
       throw new Error('Failed to get Twitch access token');
     }
+
+    // Handle channel search
+    if (action === 'search_channels' && query) {
+      console.log(`Searching Twitch channels for: ${query}`);
+      
+      const searchUrl = `https://api.twitch.tv/helix/search/channels?query=${encodeURIComponent(query)}&first=10&live_only=false`;
+      
+      const searchResponse = await fetch(searchUrl, {
+        headers: {
+          'Client-ID': TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
+      const searchData = await searchResponse.json();
+      
+      const channels = (searchData.data || []).map((ch: any) => ({
+        id: ch.id,
+        broadcaster_login: ch.broadcaster_login,
+        display_name: ch.display_name,
+        thumbnail_url: ch.thumbnail_url,
+        is_live: ch.is_live,
+        game_name: ch.game_name || '',
+        title: ch.title || '',
+        started_at: ch.started_at || '',
+      }));
+      
+      return new Response(
+        JSON.stringify({ success: true, channels }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Fetching clips - language: ${language}, limit: ${limit}, cursor: ${cursor}, gameId: ${gameId}`);
 
     const startedAt = new Date();
     startedAt.setHours(startedAt.getHours() - 24);
