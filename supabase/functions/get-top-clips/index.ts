@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { action, query, language = 'es', limit = 20, cursor, gameId, timeFilter = '24h' } = body;
+    const { action, query, language = 'es', limit = 20, cursor, gameId, timeFilter = '24h', broadcasterName } = body;
     
     const TWITCH_CLIENT_ID = Deno.env.get('TWITCH_CLIENT_ID');
     const TWITCH_CLIENT_SECRET = Deno.env.get('TWITCH_CLIENT_SECRET');
@@ -75,7 +75,32 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Fetching clips - language: ${language}, limit: ${limit}, cursor: ${cursor}, gameId: ${gameId}, timeFilter: ${timeFilter}`);
+    // If filtering by broadcaster name, get broadcaster ID first
+    let broadcasterId: string | undefined;
+    if (broadcasterName) {
+      console.log(`Searching for broadcaster: ${broadcasterName}`);
+      const searchUrl = `https://api.twitch.tv/helix/search/channels?query=${encodeURIComponent(broadcasterName)}&first=1`;
+      
+      const searchResponse = await fetch(searchUrl, {
+        headers: {
+          'Client-ID': TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+      
+      const searchData = await searchResponse.json();
+      if (searchData.data && searchData.data.length > 0) {
+        // Find exact match or use first result
+        const exactMatch = searchData.data.find((ch: any) => 
+          ch.broadcaster_login.toLowerCase() === broadcasterName.toLowerCase() ||
+          ch.display_name.toLowerCase() === broadcasterName.toLowerCase()
+        );
+        broadcasterId = exactMatch?.id || searchData.data[0].id;
+        console.log(`Found broadcaster ID: ${broadcasterId}`);
+      }
+    }
+
+    console.log(`Fetching clips - language: ${language}, limit: ${limit}, cursor: ${cursor}, gameId: ${gameId}, timeFilter: ${timeFilter}, broadcasterName: ${broadcasterName}`);
 
     // Calculate time range based on filter
     const timeFilterHours: Record<string, number> = {
@@ -106,6 +131,82 @@ serve(async (req) => {
     const topGames = gamesData.data || [];
     console.log('Found games:', topGames.length);
     
+    // If filtering by broadcaster, fetch directly from broadcaster
+    if (broadcasterId) {
+      console.log(`Fetching clips for broadcaster ID: ${broadcasterId}`);
+      
+      const allClips: any[] = [];
+      let clipCursor: string | undefined;
+      const MAX_PAGES = 10;
+      
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const url = new URL('https://api.twitch.tv/helix/clips');
+        url.searchParams.set('broadcaster_id', broadcasterId);
+        url.searchParams.set('first', '100');
+        url.searchParams.set('started_at', startedAt.toISOString());
+        if (clipCursor) {
+          url.searchParams.set('after', clipCursor);
+        }
+        
+        const clipsResponse = await fetch(url.toString(), {
+          headers: {
+            'Client-ID': TWITCH_CLIENT_ID,
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+        
+        const clipsData = await clipsResponse.json();
+        
+        if (!clipsData.data || clipsData.data.length === 0) break;
+        
+        for (const clip of clipsData.data) {
+          allClips.push({ ...clip, game_name: clip.game_id ? topGames.find((g: any) => g.id === clip.game_id)?.name || 'Unknown' : 'Unknown' });
+        }
+        
+        clipCursor = clipsData.pagination?.cursor;
+        if (!clipCursor) break;
+      }
+      
+      console.log(`Total clips from broadcaster: ${allClips.length}`);
+      
+      // Sort by view count
+      allClips.sort((a, b) => b.view_count - a.view_count);
+      
+      // Parse cursor for pagination
+      const startIndex = cursor ? parseInt(cursor, 10) : 0;
+      const endIndex = startIndex + limit;
+      const paginatedClips = allClips.slice(startIndex, endIndex);
+      const nextCursor = endIndex < allClips.length ? endIndex.toString() : null;
+      
+      const formattedClips = paginatedClips.map((clip: any) => ({
+        id: clip.id,
+        title: clip.title,
+        broadcaster_name: clip.broadcaster_name,
+        game_name: clip.game_name || 'Unknown',
+        thumbnail_url: clip.thumbnail_url,
+        view_count: clip.view_count,
+        duration: clip.duration,
+        created_at: clip.created_at,
+        url: clip.url,
+        embed_url: clip.embed_url,
+        language: 'unknown',
+      }));
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          clips: formattedClips,
+          games: topGames.map((g: any) => ({ id: g.id, name: g.name })),
+          totalFound: allClips.length,
+          nextCursor,
+          language,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // Progressive fetching strategy to get more clips without timeout
     // When filtering by gameId: fetch more pages for that specific game
     // When fetching all: distribute requests across more games with fewer pages each
