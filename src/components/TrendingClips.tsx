@@ -2,8 +2,9 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer } from "lucide-react";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer, User, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TrendingClip {
@@ -55,6 +56,8 @@ const TrendingClips = () => {
   const [language, setLanguage] = useState('es');
   const [gameId, setGameId] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState('24h');
+  const [streamerFilter, setStreamerFilter] = useState('');
+  const [streamerInput, setStreamerInput] = useState('');
   const [totalFound, setTotalFound] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   
@@ -80,6 +83,7 @@ const TrendingClips = () => {
           cursor: cursorToUse,
           gameId: gameId === 'all' ? undefined : gameId,
           timeFilter,
+          broadcasterName: streamerFilter || undefined,
         }
       });
       
@@ -106,13 +110,28 @@ const TrendingClips = () => {
 
   useEffect(() => {
     fetchTrendingClips(true);
-  }, [language, gameId, timeFilter]);
+  }, [language, gameId, timeFilter, streamerFilter]);
 
   const loadMore = useCallback(() => {
     if (nextCursor && !isLoadingMore && !isLoading) {
       fetchTrendingClips(false, nextCursor);
     }
-  }, [nextCursor, isLoadingMore, isLoading, language, gameId, timeFilter]);
+  }, [nextCursor, isLoadingMore, isLoading, language, gameId, timeFilter, streamerFilter]);
+
+  const handleStreamerSearch = () => {
+    setStreamerFilter(streamerInput.trim());
+  };
+
+  const handleStreamerKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleStreamerSearch();
+    }
+  };
+
+  const clearStreamerFilter = () => {
+    setStreamerFilter('');
+    setStreamerInput('');
+  };
 
   // Infinite scroll observer
   useEffect(() => {
@@ -258,7 +277,44 @@ const TrendingClips = () => {
               </SelectContent>
             </Select>
           </div>
+          
+          {/* Streamer filter */}
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <div className="flex gap-1">
+              <Input
+                placeholder="Filtrar por streamer..."
+                value={streamerInput}
+                onChange={(e) => setStreamerInput(e.target.value)}
+                onKeyPress={handleStreamerKeyPress}
+                className="w-[180px] h-9"
+              />
+              {streamerFilter && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={clearStreamerFilter}
+                  className="h-9 w-9"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
+        
+        {/* Active streamer filter badge */}
+        {streamerFilter && (
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              <User className="h-3 w-3 mr-1" />
+              Streamer: {streamerFilter}
+              <button onClick={clearStreamerFilter} className="ml-2 hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          </div>
+        )}
       </div>
 
       {isLoading && clips.length === 0 ? (
