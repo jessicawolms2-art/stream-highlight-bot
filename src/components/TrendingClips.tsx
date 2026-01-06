@@ -4,7 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer, User, X } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer, User, X, EyeOff, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TrendingClip {
@@ -51,6 +52,21 @@ const TIME_FILTERS = [
   { value: '30d', label: '1 mes', hours: 720 },
 ];
 
+const VIEWED_CLIPS_KEY = 'twitch_viewed_clips';
+
+const getViewedClips = (): Set<string> => {
+  try {
+    const stored = localStorage.getItem(VIEWED_CLIPS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+const saveViewedClips = (clips: Set<string>) => {
+  localStorage.setItem(VIEWED_CLIPS_KEY, JSON.stringify([...clips]));
+};
+
 const TrendingClips = () => {
   const [clips, setClips] = useState<TrendingClip[]>([]);
   const [games, setGames] = useState<Game[]>([]);
@@ -64,6 +80,8 @@ const TrendingClips = () => {
   const [streamerInput, setStreamerInput] = useState('');
   const [totalFound, setTotalFound] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [viewedClips, setViewedClips] = useState<Set<string>>(getViewedClips);
+  const [hideViewed, setHideViewed] = useState(false);
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -136,6 +154,30 @@ const TrendingClips = () => {
     setStreamerFilter('');
     setStreamerInput('');
   };
+
+  const toggleViewedClip = (clipId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setViewedClips(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(clipId)) {
+        newSet.delete(clipId);
+      } else {
+        newSet.add(clipId);
+      }
+      saveViewedClips(newSet);
+      return newSet;
+    });
+  };
+
+  const clearAllViewed = () => {
+    setViewedClips(new Set());
+    localStorage.removeItem(VIEWED_CLIPS_KEY);
+  };
+
+  const filteredClips = hideViewed 
+    ? clips.filter(clip => !viewedClips.has(clip.id))
+    : clips;
 
   // Infinite scroll observer
   useEffect(() => {
@@ -305,6 +347,29 @@ const TrendingClips = () => {
               )}
             </div>
           </div>
+          
+          {/* Hide viewed toggle */}
+          <div className="flex items-center gap-2">
+            <EyeOff className="h-4 w-4 text-muted-foreground" />
+            <Switch 
+              checked={hideViewed} 
+              onCheckedChange={setHideViewed}
+              id="hide-viewed"
+            />
+            <label htmlFor="hide-viewed" className="text-sm text-muted-foreground cursor-pointer">
+              Ocultar vistos ({viewedClips.size})
+            </label>
+            {viewedClips.size > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllViewed}
+                className="h-7 text-xs"
+              >
+                Limpiar
+              </Button>
+            )}
+          </div>
         </div>
         
         {/* Active streamer filter badge */}
@@ -333,72 +398,105 @@ const TrendingClips = () => {
             Reintentar
           </Button>
         </div>
-      ) : clips.length === 0 ? (
+      ) : filteredClips.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Flame className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p>No se encontraron clips con los filtros seleccionados</p>
-          <p className="text-sm mt-2">Prueba con otros filtros</p>
+          <p>{hideViewed && clips.length > 0 ? 'Todos los clips han sido marcados como vistos' : 'No se encontraron clips con los filtros seleccionados'}</p>
+          <p className="text-sm mt-2">{hideViewed && clips.length > 0 ? 'Desactiva "Ocultar vistos" o limpia el historial' : 'Prueba con otros filtros'}</p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {clips.map((clip, index) => (
-              <a
+            {filteredClips.map((clip, index) => (
+              <div
                 key={clip.id}
-                href={clip.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative rounded-lg overflow-hidden bg-secondary border border-border hover:border-primary transition-all hover:scale-[1.02]"
+                className={`group relative rounded-lg overflow-hidden bg-secondary border transition-all hover:scale-[1.02] ${
+                  viewedClips.has(clip.id) ? 'border-muted opacity-60' : 'border-border hover:border-primary'
+                }`}
               >
-                {/* Thumbnail */}
-                <div className="relative aspect-video">
-                  <img
-                    src={clip.thumbnail_url}
-                    alt={clip.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                  {/* Rank badge */}
-                  {index < 3 && (
-                    <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      index === 0 ? 'bg-yellow-500 text-yellow-950' :
-                      index === 1 ? 'bg-gray-300 text-gray-800' :
-                      'bg-amber-600 text-amber-950'
-                    }`}>
-                      {index + 1}
+                <a
+                  href={clip.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  {/* Thumbnail */}
+                  <div className="relative aspect-video">
+                    <img
+                      src={clip.thumbnail_url}
+                      alt={clip.title}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    {/* Rank badge */}
+                    {index < 3 && !hideViewed && (
+                      <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        index === 0 ? 'bg-yellow-500 text-yellow-950' :
+                        index === 1 ? 'bg-gray-300 text-gray-800' :
+                        'bg-amber-600 text-amber-950'
+                      }`}>
+                        {index + 1}
+                      </div>
+                    )}
+                    {/* Viewed badge */}
+                    {viewedClips.has(clip.id) && (
+                      <div className="absolute top-2 left-2 px-2 py-1 rounded bg-muted/90 text-xs font-medium flex items-center gap-1">
+                        <Check className="h-3 w-3" />
+                        Visto
+                      </div>
+                    )}
+                    {/* Duration */}
+                    <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-background/80 text-xs font-medium">
+                      {formatDuration(clip.duration)}
                     </div>
-                  )}
-                  {/* Duration */}
-                  <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-background/80 text-xs font-medium">
-                    {formatDuration(clip.duration)}
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <ExternalLink className="h-8 w-8 text-primary-foreground" />
+                    </div>
                   </div>
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <ExternalLink className="h-8 w-8 text-primary-foreground" />
+                  
+                  {/* Info */}
+                  <div className="p-3">
+                    <h4 className="text-sm font-medium text-foreground line-clamp-2 mb-2 group-hover:text-primary transition-colors">
+                      {clip.title}
+                    </h4>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="truncate max-w-[60%]">{clip.broadcaster_name}</span>
+                      <div className="flex items-center gap-1">
+                        <Eye className="h-3 w-3" />
+                        <span>{formatViewCount(clip.view_count)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                      <span className="truncate max-w-[60%]">{clip.game_name}</span>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{getTimeAgo(clip.created_at)}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </a>
                 
-                {/* Info */}
-                <div className="p-3">
-                  <h4 className="text-sm font-medium text-foreground line-clamp-2 mb-2 group-hover:text-primary transition-colors">
-                    {clip.title}
-                  </h4>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="truncate max-w-[60%]">{clip.broadcaster_name}</span>
-                    <div className="flex items-center gap-1">
-                      <Eye className="h-3 w-3" />
-                      <span>{formatViewCount(clip.view_count)}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
-                    <span className="truncate max-w-[60%]">{clip.game_name}</span>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      <span>{getTimeAgo(clip.created_at)}</span>
-                    </div>
-                  </div>
-                </div>
-              </a>
+                {/* Mark as viewed button */}
+                <Button
+                  variant={viewedClips.has(clip.id) ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={(e) => toggleViewedClip(clip.id, e)}
+                  className="absolute top-2 right-2 h-7 px-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 hover:bg-background"
+                >
+                  {viewedClips.has(clip.id) ? (
+                    <>
+                      <X className="h-3 w-3 mr-1" />
+                      Quitar
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-3 w-3 mr-1" />
+                      Visto
+                    </>
+                  )}
+                </Button>
+              </div>
             ))}
           </div>
           
