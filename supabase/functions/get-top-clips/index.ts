@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { action, query, language = 'es', limit = 20, cursor, gameId } = body;
+    const { action, query, language = 'es', limit = 20, cursor, gameId, timeFilter = '24h' } = body;
     
     const TWITCH_CLIENT_ID = Deno.env.get('TWITCH_CLIENT_ID');
     const TWITCH_CLIENT_SECRET = Deno.env.get('TWITCH_CLIENT_SECRET');
@@ -75,10 +75,20 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Fetching clips - language: ${language}, limit: ${limit}, cursor: ${cursor}, gameId: ${gameId}`);
+    console.log(`Fetching clips - language: ${language}, limit: ${limit}, cursor: ${cursor}, gameId: ${gameId}, timeFilter: ${timeFilter}`);
+
+    // Calculate time range based on filter
+    const timeFilterHours: Record<string, number> = {
+      '12h': 12,
+      '24h': 24,
+      '3d': 72,
+      '7d': 168,
+      '30d': 720,
+    };
+    const hoursBack = timeFilterHours[timeFilter] || 24;
 
     const startedAt = new Date();
-    startedAt.setHours(startedAt.getHours() - 24);
+    startedAt.setHours(startedAt.getHours() - hoursBack);
 
     // Get top games for the filter dropdown
     console.log('Fetching top games...');

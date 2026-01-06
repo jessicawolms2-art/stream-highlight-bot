@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2 } from "lucide-react";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TrendingClip {
@@ -38,6 +38,14 @@ const LANGUAGES = [
   { code: 'all', name: 'Todos los idiomas' },
 ];
 
+const TIME_FILTERS = [
+  { value: '12h', label: '12 horas', hours: 12 },
+  { value: '24h', label: '24 horas', hours: 24 },
+  { value: '3d', label: '3 días', hours: 72 },
+  { value: '7d', label: '1 semana', hours: 168 },
+  { value: '30d', label: '1 mes', hours: 720 },
+];
+
 const TrendingClips = () => {
   const [clips, setClips] = useState<TrendingClip[]>([]);
   const [games, setGames] = useState<Game[]>([]);
@@ -46,6 +54,7 @@ const TrendingClips = () => {
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState('es');
   const [gameId, setGameId] = useState<string>('all');
+  const [timeFilter, setTimeFilter] = useState('24h');
   const [totalFound, setTotalFound] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   
@@ -70,6 +79,7 @@ const TrendingClips = () => {
           limit: 20,
           cursor: cursorToUse,
           gameId: gameId === 'all' ? undefined : gameId,
+          timeFilter,
         }
       });
       
@@ -96,13 +106,13 @@ const TrendingClips = () => {
 
   useEffect(() => {
     fetchTrendingClips(true);
-  }, [language, gameId]);
+  }, [language, gameId, timeFilter]);
 
   const loadMore = useCallback(() => {
     if (nextCursor && !isLoadingMore && !isLoading) {
       fetchTrendingClips(false, nextCursor);
     }
-  }, [nextCursor, isLoadingMore, isLoading, language, gameId]);
+  }, [nextCursor, isLoadingMore, isLoading, language, gameId, timeFilter]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -136,6 +146,10 @@ const TrendingClips = () => {
 
   const handleGameChange = (newGameId: string) => {
     setGameId(newGameId);
+  };
+
+  const handleTimeFilterChange = (newTimeFilter: string) => {
+    setTimeFilter(newTimeFilter);
   };
 
   const formatViewCount = (count: number): string => {
@@ -172,7 +186,7 @@ const TrendingClips = () => {
           <div className="flex items-center gap-2">
             <Flame className="h-5 w-5 text-accent" />
             <h3 className="text-lg font-semibold text-foreground">
-              Clips Trending (24h)
+              Clips Trending ({TIME_FILTERS.find(t => t.value === timeFilter)?.label || '24h'})
             </h3>
             {totalFound > 0 && (
               <Badge variant="secondary" className="text-xs">
@@ -224,6 +238,21 @@ const TrendingClips = () => {
                 {LANGUAGES.map((lang) => (
                   <SelectItem key={lang.code} value={lang.code}>
                     {lang.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Timer className="h-4 w-4 text-muted-foreground" />
+            <Select value={timeFilter} onValueChange={handleTimeFilterChange}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Tiempo" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIME_FILTERS.map((filter) => (
+                  <SelectItem key={filter.value} value={filter.value}>
+                    {filter.label}
                   </SelectItem>
                 ))}
               </SelectContent>
