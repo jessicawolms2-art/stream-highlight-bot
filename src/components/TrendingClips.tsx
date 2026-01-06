@@ -40,6 +40,10 @@ const LANGUAGES = [
 ];
 
 const TIME_FILTERS = [
+  { value: '1h', label: '1 hora', hours: 1 },
+  { value: '2h', label: '2 horas', hours: 2 },
+  { value: '3h', label: '3 horas', hours: 3 },
+  { value: '6h', label: '6 horas', hours: 6 },
   { value: '12h', label: '12 horas', hours: 12 },
   { value: '24h', label: '24 horas', hours: 24 },
   { value: '3d', label: '3 días', hours: 72 },
