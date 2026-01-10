@@ -3,8 +3,12 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Gamepad2, Calendar } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Gamepad2, Calendar, CheckCircle, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+
+const VIEWED_CLIPS_KEY = 'kick_viewed_clips';
 
 interface KickClip {
   id: string;
@@ -37,6 +41,19 @@ const SORT_OPTIONS = [
   { code: 'recent', name: 'Más recientes' },
 ];
 
+const getViewedClips = (): Set<string> => {
+  try {
+    const stored = localStorage.getItem(VIEWED_CLIPS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+};
+
+const saveViewedClips = (viewed: Set<string>) => {
+  localStorage.setItem(VIEWED_CLIPS_KEY, JSON.stringify([...viewed]));
+};
+
 const KickTrendingClips = () => {
   const [clips, setClips] = useState<KickClip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -48,9 +65,33 @@ const KickTrendingClips = () => {
   const [sortBy, setSortBy] = useState('view');
   const [totalFound, setTotalFound] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [viewedClips, setViewedClips] = useState<Set<string>>(getViewedClips);
+  const [hideViewed, setHideViewed] = useState(false);
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  const toggleViewedClip = (clipId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const newViewed = new Set(viewedClips);
+    if (newViewed.has(clipId)) {
+      newViewed.delete(clipId);
+    } else {
+      newViewed.add(clipId);
+    }
+    setViewedClips(newViewed);
+    saveViewedClips(newViewed);
+  };
+
+  const clearAllViewed = () => {
+    setViewedClips(new Set());
+    localStorage.removeItem(VIEWED_CLIPS_KEY);
+  };
+
+  const filteredClips = hideViewed 
+    ? clips.filter(clip => !viewedClips.has(clip.id))
+    : clips;
 
   const fetchKickClips = async (reset = true, cursorOverride?: string | null) => {
     if (reset) {
@@ -237,6 +278,31 @@ const KickTrendingClips = () => {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Viewed clips controls */}
+          <div className="flex items-center gap-4 border-l border-border pl-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="hide-viewed-kick"
+                checked={hideViewed}
+                onCheckedChange={setHideViewed}
+              />
+              <Label htmlFor="hide-viewed-kick" className="text-sm text-muted-foreground cursor-pointer">
+                Ocultar vistos
+              </Label>
+            </div>
+            {viewedClips.size > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearAllViewed}
+                className="h-7 text-xs text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Limpiar ({viewedClips.size})
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -261,68 +327,91 @@ const KickTrendingClips = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {clips.map((clip, index) => (
-              <a
-                key={clip.id}
-                href={clip.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative rounded-lg overflow-hidden bg-secondary border border-border hover:border-[#53fc18] transition-all hover:scale-[1.02]"
-              >
-                {/* Thumbnail */}
-                <div className="relative aspect-video">
-                  <img
-                    src={clip.thumbnail_url || '/placeholder.svg'}
-                    alt={clip.title}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/placeholder.svg';
-                    }}
-                  />
-                  {/* Rank badge */}
-                  {index < 3 && (
-                    <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                      index === 0 ? 'bg-yellow-500 text-yellow-950' :
-                      index === 1 ? 'bg-gray-300 text-gray-800' :
-                      'bg-amber-600 text-amber-950'
-                    }`}>
-                      {index + 1}
+            {filteredClips.map((clip, index) => {
+              const isViewed = viewedClips.has(clip.id);
+              return (
+                <a
+                  key={clip.id}
+                  href={clip.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`group relative rounded-lg overflow-hidden bg-secondary border transition-all hover:scale-[1.02] ${
+                    isViewed 
+                      ? 'border-muted opacity-60 hover:opacity-100' 
+                      : 'border-border hover:border-[#53fc18]'
+                  }`}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative aspect-video">
+                    <img
+                      src={clip.thumbnail_url || '/placeholder.svg'}
+                      alt={clip.title}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/placeholder.svg';
+                      }}
+                    />
+                    {/* Viewed badge */}
+                    {isViewed && (
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-xs font-medium flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Visto
+                      </div>
+                    )}
+                    {/* Rank badge */}
+                    {index < 3 && !isViewed && (
+                      <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        index === 0 ? 'bg-yellow-500 text-yellow-950' :
+                        index === 1 ? 'bg-gray-300 text-gray-800' :
+                        'bg-amber-600 text-amber-950'
+                      }`}>
+                        {index + 1}
+                      </div>
+                    )}
+                    {/* Duration */}
+                    <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-background/80 text-xs font-medium">
+                      {formatDuration(clip.duration)}
                     </div>
-                  )}
-                  {/* Duration */}
-                  <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-background/80 text-xs font-medium">
-                    {formatDuration(clip.duration)}
-                  </div>
-                  {/* Views overlay */}
-                  <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-[#53fc18]/90 text-black text-xs font-medium flex items-center gap-1">
-                    <Eye className="h-3 w-3" />
-                    {formatViewCount(clip.view_count)}
-                  </div>
-                  {/* Hover overlay */}
-                  <div className="absolute inset-0 bg-[#53fc18]/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <ExternalLink className="h-8 w-8 text-white" />
-                  </div>
-                </div>
-                
-                {/* Info */}
-                <div className="p-3">
-                  <h4 className="text-sm font-medium text-foreground line-clamp-2 mb-2 group-hover:text-[#53fc18] transition-colors">
-                    {clip.title}
-                  </h4>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="truncate max-w-[60%]">{clip.broadcaster_name}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
-                    <span className="truncate max-w-[60%]">{clip.game_name}</span>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      <span>{getTimeAgo(clip.created_at)}</span>
+                    {/* Views overlay */}
+                    <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-[#53fc18]/90 text-black text-xs font-medium flex items-center gap-1">
+                      <Eye className="h-3 w-3" />
+                      {formatViewCount(clip.view_count)}
+                    </div>
+                    {/* Mark as viewed button */}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={(e) => toggleViewedClip(clip.id, e)}
+                      className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity h-7 text-xs"
+                    >
+                      {isViewed ? 'Quitar' : 'Visto'}
+                    </Button>
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-[#53fc18]/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                      <ExternalLink className="h-8 w-8 text-white" />
                     </div>
                   </div>
-                </div>
-              </a>
-            ))}
+                  
+                  {/* Info */}
+                  <div className="p-3">
+                    <h4 className="text-sm font-medium text-foreground line-clamp-2 mb-2 group-hover:text-[#53fc18] transition-colors">
+                      {clip.title}
+                    </h4>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="truncate max-w-[60%]">{clip.broadcaster_name}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                      <span className="truncate max-w-[60%]">{clip.game_name}</span>
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{getTimeAgo(clip.created_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
           </div>
           
           {/* Infinite scroll trigger */}
