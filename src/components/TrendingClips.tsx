@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer, User, X, EyeOff, Check } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer, User, X, EyeOff, Check, Radio } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TrendingClip {
@@ -25,6 +26,15 @@ interface TrendingClip {
 interface Game {
   id: string;
   name: string;
+}
+
+interface TwitchChannel {
+  id: string;
+  broadcaster_login: string;
+  display_name: string;
+  thumbnail_url: string;
+  is_live: boolean;
+  game_name: string;
 }
 
 const LANGUAGES = [
@@ -78,6 +88,10 @@ const TrendingClips = () => {
   const [timeFilter, setTimeFilter] = useState('24h');
   const [streamerFilter, setStreamerFilter] = useState('');
   const [streamerInput, setStreamerInput] = useState('');
+  const [selectedStreamerAvatar, setSelectedStreamerAvatar] = useState<string | null>(null);
+  const [channelSuggestions, setChannelSuggestions] = useState<TwitchChannel[]>([]);
+  const [isSearchingChannels, setIsSearchingChannels] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [totalFound, setTotalFound] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [viewedClips, setViewedClips] = useState<Set<string>>(getViewedClips);
@@ -85,6 +99,8 @@ const TrendingClips = () => {
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const fetchTrendingClips = async (reset = true, cursorOverride?: string | null) => {
     if (reset) {
@@ -140,19 +156,66 @@ const TrendingClips = () => {
     }
   }, [nextCursor, isLoadingMore, isLoading, language, gameId, timeFilter, streamerFilter]);
 
-  const handleStreamerSearch = () => {
-    setStreamerFilter(streamerInput.trim());
+  // Search channels for autocomplete
+  const searchChannels = useCallback(async (query: string) => {
+    if (query.length < 2) {
+      setChannelSuggestions([]);
+      return;
+    }
+    
+    setIsSearchingChannels(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-top-clips', {
+        body: { action: 'search_channels', query }
+      });
+      
+      if (error) throw error;
+      setChannelSuggestions(data.channels || []);
+      setShowSuggestions(true);
+    } catch (err) {
+      console.error('Error searching channels:', err);
+      setChannelSuggestions([]);
+    } finally {
+      setIsSearchingChannels(false);
+    }
+  }, []);
+
+  const handleStreamerInputChange = (value: string) => {
+    setStreamerInput(value);
+    
+    // Debounce the search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    searchTimeoutRef.current = setTimeout(() => {
+      searchChannels(value);
+    }, 300);
+  };
+
+  const selectChannel = (channel: TwitchChannel) => {
+    setStreamerInput(channel.display_name);
+    setStreamerFilter(channel.display_name);
+    setSelectedStreamerAvatar(channel.thumbnail_url);
+    setShowSuggestions(false);
+    setChannelSuggestions([]);
   };
 
   const handleStreamerKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleStreamerSearch();
+      setStreamerFilter(streamerInput.trim());
+      setShowSuggestions(false);
+    }
+    if (e.key === 'Escape') {
+      setShowSuggestions(false);
     }
   };
 
   const clearStreamerFilter = () => {
     setStreamerFilter('');
     setStreamerInput('');
+    setSelectedStreamerAvatar(null);
+    setChannelSuggestions([]);
   };
 
   const toggleViewedClip = (clipId: string, e: React.MouseEvent) => {
@@ -324,27 +387,84 @@ const TrendingClips = () => {
             </Select>
           </div>
           
-          {/* Streamer filter */}
+          {/* Streamer filter with autocomplete */}
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            <div className="flex gap-1">
-              <Input
-                placeholder="Filtrar por streamer..."
-                value={streamerInput}
-                onChange={(e) => setStreamerInput(e.target.value)}
-                onKeyPress={handleStreamerKeyPress}
-                className="w-[180px] h-9"
-              />
-              {streamerFilter && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={clearStreamerFilter}
-                  className="h-9 w-9"
+            <div className="relative">
+              <Popover open={showSuggestions && channelSuggestions.length > 0} onOpenChange={setShowSuggestions}>
+                <PopoverTrigger asChild>
+                  <div className="flex gap-1">
+                    <div className="relative">
+                      {selectedStreamerAvatar && streamerFilter && (
+                        <img
+                          src={selectedStreamerAvatar}
+                          alt=""
+                          className="absolute left-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full"
+                        />
+                      )}
+                      <Input
+                        ref={inputRef}
+                        placeholder="Buscar streamer..."
+                        value={streamerInput}
+                        onChange={(e) => handleStreamerInputChange(e.target.value)}
+                        onKeyDown={handleStreamerKeyPress}
+                        onFocus={() => streamerInput.length >= 2 && setShowSuggestions(true)}
+                        className={`w-[200px] h-9 ${selectedStreamerAvatar && streamerFilter ? 'pl-9' : ''}`}
+                      />
+                      {isSearchingChannels && (
+                        <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                    {streamerFilter && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={clearStreamerFilter}
+                        className="h-9 w-9"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent 
+                  className="w-[280px] p-1" 
+                  align="start"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
                 >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {channelSuggestions.map((channel) => (
+                      <button
+                        key={channel.id}
+                        onClick={() => selectChannel(channel)}
+                        className="w-full flex items-center gap-3 p-2 hover:bg-accent rounded-md transition-colors text-left"
+                      >
+                        <img
+                          src={channel.thumbnail_url}
+                          alt={channel.display_name}
+                          className="w-8 h-8 rounded-full"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm truncate">{channel.display_name}</span>
+                            {channel.is_live && (
+                              <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4 flex items-center gap-1">
+                                <Radio className="h-2 w-2" />
+                                LIVE
+                              </Badge>
+                            )}
+                          </div>
+                          {channel.game_name && (
+                            <span className="text-xs text-muted-foreground truncate block">
+                              {channel.game_name}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
           
@@ -375,10 +495,12 @@ const TrendingClips = () => {
         {/* Active streamer filter badge */}
         {streamerFilter && (
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-xs">
-              <User className="h-3 w-3 mr-1" />
-              Streamer: {streamerFilter}
-              <button onClick={clearStreamerFilter} className="ml-2 hover:text-destructive">
+            <Badge variant="secondary" className="text-xs flex items-center gap-1">
+              {selectedStreamerAvatar && (
+                <img src={selectedStreamerAvatar} alt="" className="w-4 h-4 rounded-full" />
+              )}
+              <span>Streamer: {streamerFilter}</span>
+              <button onClick={clearStreamerFilter} className="ml-1 hover:text-destructive">
                 <X className="h-3 w-3" />
               </button>
             </Badge>
