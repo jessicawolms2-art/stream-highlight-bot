@@ -121,7 +121,7 @@ serve(async (req) => {
     const seenClipIds = new Set<string>();
     const categoriesSet = new Map<string, string>();
     
-    // Spanish streamer slugs to prioritize for Spanish content
+    // Spanish streamer slugs to prioritize for Spanish content - expanded list
     const spanishStreamers = [
       'auronplay', 'ibai', 'elxokas', 'illojuan', 'rubius', 'thegrefg', 
       'juansguarnizo', 'rivers_gg', 'westcol', 'arigameplays', 'elmariana',
@@ -130,7 +130,13 @@ serve(async (req) => {
       'davidguapo', 'jordiWild', 'llados', 'cheeto', 'zeling', 'werlyb',
       'knekro', 'reborn', 'mayichi', 'jaggerprincesa', 'carola', 'cristinini',
       'silithur', 'byviruzz', 'paracetamor', 'zorman', 'mr.granbomba',
-      'elmillor', 'spreen', 'coscu', 'momo', 'frankkaster'
+      'elmillor', 'spreen', 'coscu', 'momo', 'frankkaster',
+      // Additional popular Spanish streamers
+      'biyin', 'etoiles', 'orslok', 'perxitaa', 'elspsjordi', 'djmariio',
+      'ibelky', 'elvisitoo', 'alva', 'xfarganx', 'shadoune666', 'kenai',
+      'kidd', 'luzugames', 'staxx', 'elogamer', 'nanomor', 'windygirk',
+      'borjaval', 'papagenu', 'axozer', 'montanito', 'elrubius', 'agustabell212',
+      'zord', 'nerea', 'staryuuki', 'lilithdrake', 'casjua', 'littleragergirl'
     ];
     
     // Map time filter to Kick's format
@@ -157,8 +163,8 @@ serve(async (req) => {
     if (language === 'es') {
       console.log('Fetching clips from Spanish streamers...');
       
-      // Fetch clips from multiple Spanish streamers in parallel
-      const streamerPromises = spanishStreamers.slice(0, 15).map(async (streamer) => {
+      // Fetch clips from more Spanish streamers in parallel (increased from 15 to 30)
+      const streamerPromises = spanishStreamers.slice(0, 30).map(async (streamer) => {
         try {
           const clipsUrl = `https://kick.com/api/v2/channels/${streamer}/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}`;
           console.log(`Fetching clips from ${streamer}`);
@@ -200,11 +206,11 @@ serve(async (req) => {
       console.log(`Fetched ${allClips.length} clips from Spanish streamers`);
     }
     
-    // If we don't have enough Spanish clips, also fetch from general endpoint
-    if (allClips.length < 20) {
+    // Always also fetch from general endpoint for more variety
+    if (allClips.length < 100) {
       console.log('Fetching additional clips from general endpoint...');
       
-      const pagesToFetch = categorySlug ? 3 : 5;
+      const pagesToFetch = categorySlug ? 5 : 10; // Increased from 3/5 to 5/10
       
       for (let page = 1; page <= pagesToFetch; page++) {
         try {
