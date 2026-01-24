@@ -212,17 +212,17 @@ serve(async (req) => {
     // When fetching all: distribute requests across more games with fewer pages each
     const gamesToFetch = gameId 
       ? [{ id: gameId, name: topGames.find((g: any) => g.id === gameId)?.name || 'Unknown' }]
-      : topGames.slice(0, 25); // Fetch from 25 games
+      : topGames.slice(0, 40); // Fetch from 40 games for more variety
     
     const allClips: any[] = [];
     const broadcasterIds = new Set<string>();
     const seenClipIds = new Set<string>();
     
-    // Time budget: we have ~25 seconds before timeout, aim to finish in ~20s
+    // Time budget: we have ~25 seconds before timeout, aim to finish in ~22s
     const startTime = Date.now();
-    const TIME_BUDGET_MS = 20000; // 20 seconds max
-    const MAX_PAGES_PER_GAME = gameId ? 15 : 3; // 15 pages for specific game, 3 for general
-    const MAX_TOTAL_CLIPS = 3000; // Stop if we have enough clips
+    const TIME_BUDGET_MS = 22000; // 22 seconds max
+    const MAX_PAGES_PER_GAME = gameId ? 20 : 5; // 20 pages for specific game, 5 for general
+    const MAX_TOTAL_CLIPS = 5000; // Stop if we have enough clips
     
     // Fetch clips from games in parallel batches for speed
     const BATCH_SIZE = 5; // Process 5 games at a time
