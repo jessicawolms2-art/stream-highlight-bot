@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer, User, X, EyeOff, Check, Radio } from "lucide-react";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer, User, X, EyeOff, Check, Radio, Download } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TrendingClip {
@@ -78,6 +79,7 @@ const saveViewedClips = (clips: Set<string>) => {
 };
 
 const TrendingClips = () => {
+  const { toast } = useToast();
   const [clips, setClips] = useState<TrendingClip[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -101,6 +103,47 @@ const TrendingClips = () => {
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Download clip function - extracts MP4 URL from thumbnail
+  const handleDownloadClip = (clip: TrendingClip, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Twitch clip thumbnail URL format: https://clips-media-assets2.twitch.tv/AT-cm%7C{clip_id}-preview-480x272.jpg
+    // The actual video URL is: https://clips-media-assets2.twitch.tv/{clip_id}.mp4
+    // Extract from thumbnail_url
+    const thumbnailUrl = clip.thumbnail_url;
+    
+    // Try to extract the clip ID from various thumbnail URL formats
+    let downloadUrl = '';
+    
+    if (thumbnailUrl.includes('clips-media-assets')) {
+      // Format: https://clips-media-assets2.twitch.tv/AT-cm%7C{id}-preview-480x272.jpg
+      // or: https://clips-media-assets2.twitch.tv/{id}-preview-480x272.jpg
+      const match = thumbnailUrl.match(/clips-media-assets\d*\.twitch\.tv\/([^-]+)/);
+      if (match) {
+        const clipSlug = decodeURIComponent(match[1]);
+        downloadUrl = `https://clips-media-assets2.twitch.tv/${clipSlug}.mp4`;
+      }
+    }
+    
+    if (!downloadUrl) {
+      // Fallback: just open the clip URL
+      window.open(clip.url, '_blank', 'noopener');
+      toast({
+        title: "Abriendo clip",
+        description: "No se pudo obtener el enlace de descarga directa. Abriendo el clip en Twitch.",
+      });
+      return;
+    }
+    
+    // Open the MP4 URL directly (will trigger download or play in browser)
+    window.open(downloadUrl, '_blank', 'noopener');
+    toast({
+      title: "Descargando clip",
+      description: "El clip se está descargando. Si no inicia, haz clic derecho y 'Guardar como...'",
+    });
+  };
 
   const fetchTrendingClips = async (reset = true, cursorOverride?: string | null) => {
     if (reset) {
@@ -599,25 +642,40 @@ const TrendingClips = () => {
                   </div>
                 </a>
                 
-                {/* Mark as viewed button */}
-                <Button
-                  variant={viewedClips.has(clip.id) ? "secondary" : "ghost"}
-                  size="sm"
-                  onClick={(e) => toggleViewedClip(clip.id, e)}
-                  className="absolute top-2 right-2 h-7 px-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 hover:bg-background"
-                >
-                  {viewedClips.has(clip.id) ? (
-                    <>
-                      <X className="h-3 w-3 mr-1" />
-                      Quitar
-                    </>
-                  ) : (
-                    <>
-                      <Check className="h-3 w-3 mr-1" />
-                      Visto
-                    </>
-                  )}
-                </Button>
+                {/* Action buttons */}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Download button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => handleDownloadClip(clip, e)}
+                    className="h-7 px-2 bg-background/90 hover:bg-background"
+                    title="Descargar clip"
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Descargar
+                  </Button>
+                  
+                  {/* Mark as viewed button */}
+                  <Button
+                    variant={viewedClips.has(clip.id) ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={(e) => toggleViewedClip(clip.id, e)}
+                    className="h-7 px-2 bg-background/90 hover:bg-background"
+                  >
+                    {viewedClips.has(clip.id) ? (
+                      <>
+                        <X className="h-3 w-3 mr-1" />
+                        Quitar
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-3 w-3 mr-1" />
+                        Visto
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
