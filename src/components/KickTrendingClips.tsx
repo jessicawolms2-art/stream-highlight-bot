@@ -30,8 +30,13 @@ interface Category {
 }
 
 const TIME_FILTERS = [
+  { code: '6h', name: 'Últimas 6h' },
+  { code: '12h', name: 'Últimas 12h' },
   { code: 'day', name: 'Últimas 24h' },
+  { code: '2days', name: 'Últimos 2 días' },
+  { code: '3days', name: 'Últimos 3 días' },
   { code: 'week', name: 'Última semana' },
+  { code: '2weeks', name: 'Últimas 2 semanas' },
   { code: 'month', name: 'Último mes' },
   { code: 'all', name: 'Todo el tiempo' },
 ];
