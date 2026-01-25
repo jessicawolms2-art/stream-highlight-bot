@@ -121,22 +121,39 @@ serve(async (req) => {
     const seenClipIds = new Set<string>();
     const categoriesSet = new Map<string, string>();
     
-    // Spanish streamer slugs to prioritize for Spanish content - expanded list
+    // Spanish streamer slugs to prioritize for Spanish content - mega expanded list
     const spanishStreamers = [
+      // Top Spanish streamers
       'auronplay', 'ibai', 'elxokas', 'illojuan', 'rubius', 'thegrefg', 
       'juansguarnizo', 'rivers_gg', 'westcol', 'arigameplays', 'elmariana',
       'fernanfloo', 'ded', 'roier', 'karmaland', 'quackity', 'vegetta777',
       'alexby11', 'willyrex', 'ampeterby7', 'elded', 'gerardromero', 
-      'davidguapo', 'jordiWild', 'llados', 'cheeto', 'zeling', 'werlyb',
+      'davidguapo', 'jordiwild', 'llados', 'cheeto', 'zeling', 'werlyb',
       'knekro', 'reborn', 'mayichi', 'jaggerprincesa', 'carola', 'cristinini',
-      'silithur', 'byviruzz', 'paracetamor', 'zorman', 'mr.granbomba',
+      'silithur', 'byviruzz', 'paracetamor', 'zorman', 'mrgranbomba',
       'elmillor', 'spreen', 'coscu', 'momo', 'frankkaster',
       // Additional popular Spanish streamers
       'biyin', 'etoiles', 'orslok', 'perxitaa', 'elspsjordi', 'djmariio',
       'ibelky', 'elvisitoo', 'alva', 'xfarganx', 'shadoune666', 'kenai',
       'kidd', 'luzugames', 'staxx', 'elogamer', 'nanomor', 'windygirk',
       'borjaval', 'papagenu', 'axozer', 'montanito', 'elrubius', 'agustabell212',
-      'zord', 'nerea', 'staryuuki', 'lilithdrake', 'casjua', 'littleragergirl'
+      'zord', 'nerea', 'staryuuki', 'lilithdrake', 'casjua', 'littleragergirl',
+      // More Spanish/LATAM streamers
+      'rakon', 'fargan', 'bymonkeyes', 'bystaxx', 'reventxz', 'wismichu',
+      'rockerbob', 'lolito', 'polispol', 'outconsumer', 'grefusa', 'vicens',
+      'folagor', 'th3antonio', 'mangelrogel', 'agar', 'nekojitablog', 'rickyedit',
+      'thelastfeedback', 'zeballos', 'duxo', 'yeyo', 'minijuegosadri', 'lady',
+      'ander', 'ssjoseph', 'arumisf', 'mrnabo', 'davidr', 'bebe',
+      'papi_gavi', 'luzu', 'town', 'karchez', 'danirep', 'rubiuh',
+      'ansjoa', 'zarcort', 'kronno', 'dosser', 'alkapone', 'thefatrat',
+      // Argentina/Chile/Colombia streamers
+      'coscu', 'duki', 'cosculindo', 'argenpe', 'tomii11', 'yao_cabrera',
+      'robleis', 'demente', 'juegagerman', 'fercho', 'chilenito',
+      'tiparraco', 'josecortes', 'alexis8a', 'markitooo', 'lacasitahp',
+      // Mexico streamers
+      'werevertumorro', 'luisitocomunica', 'juegermanplays', 'elmariana',
+      'dross', 'aczino', 'deigamer', 'thedonato', 'yosoyplex',
+      'maurg1', 'memo_aponte', 'godyolo', 'espi', 'manucraft'
     ];
     
     // Map time filter to Kick's format
@@ -163,8 +180,8 @@ serve(async (req) => {
     if (language === 'es') {
       console.log('Fetching clips from Spanish streamers...');
       
-      // Fetch clips from more Spanish streamers in parallel (increased from 15 to 30)
-      const streamerPromises = spanishStreamers.slice(0, 30).map(async (streamer) => {
+      // Fetch clips from all Spanish streamers in parallel (up to 60)
+      const streamerPromises = spanishStreamers.slice(0, 60).map(async (streamer) => {
         try {
           const clipsUrl = `https://kick.com/api/v2/channels/${streamer}/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}`;
           console.log(`Fetching clips from ${streamer}`);
@@ -207,10 +224,10 @@ serve(async (req) => {
     }
     
     // Always also fetch from general endpoint for more variety
-    if (allClips.length < 100) {
+    if (allClips.length < 200) {
       console.log('Fetching additional clips from general endpoint...');
       
-      const pagesToFetch = categorySlug ? 5 : 10; // Increased from 3/5 to 5/10
+      const pagesToFetch = categorySlug ? 10 : 20; // Increased from 5/10 to 10/20
       
       for (let page = 1; page <= pagesToFetch; page++) {
         try {
