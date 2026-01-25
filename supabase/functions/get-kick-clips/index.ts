@@ -156,15 +156,31 @@ serve(async (req) => {
       'maurg1', 'memo_aponte', 'godyolo', 'espi', 'manucraft'
     ];
     
-    // Map time filter to Kick's format
-    const getTimeParam = (filter: string): string => {
+    // Map time filter to Kick's format and get hours for filtering
+    const getTimeParam = (filter: string): { kickTime: string; hoursLimit: number | null } => {
       switch (filter) {
-        case 'day': return 'day';
-        case 'week': return 'week';
-        case 'month': return 'month';
-        case 'all': return 'all';
-        default: return 'week';
+        case '6h': return { kickTime: 'day', hoursLimit: 6 };
+        case '12h': return { kickTime: 'day', hoursLimit: 12 };
+        case 'day': return { kickTime: 'day', hoursLimit: 24 };
+        case '2days': return { kickTime: 'week', hoursLimit: 48 };
+        case '3days': return { kickTime: 'week', hoursLimit: 72 };
+        case 'week': return { kickTime: 'week', hoursLimit: 168 };
+        case '2weeks': return { kickTime: 'month', hoursLimit: 336 };
+        case 'month': return { kickTime: 'month', hoursLimit: null };
+        case 'all': return { kickTime: 'all', hoursLimit: null };
+        default: return { kickTime: 'week', hoursLimit: 168 };
       }
+    };
+    
+    const timeParams = getTimeParam(timeFilter);
+    
+    // Helper to check if clip is within time limit
+    const isWithinTimeLimit = (createdAt: string): boolean => {
+      if (!timeParams.hoursLimit) return true;
+      const clipDate = new Date(createdAt);
+      const now = new Date();
+      const diffHours = (now.getTime() - clipDate.getTime()) / (1000 * 60 * 60);
+      return diffHours <= timeParams.hoursLimit;
     };
     
     // Map sort to Kick's format  
@@ -180,10 +196,10 @@ serve(async (req) => {
     if (language === 'es') {
       console.log('Fetching clips from Spanish streamers...');
       
-      // Fetch clips from all Spanish streamers in parallel (up to 60)
-      const streamerPromises = spanishStreamers.slice(0, 60).map(async (streamer) => {
+      // Fetch clips from all Spanish streamers in parallel (up to 80)
+      const streamerPromises = spanishStreamers.slice(0, 80).map(async (streamer) => {
         try {
-          const clipsUrl = `https://kick.com/api/v2/channels/${streamer}/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}`;
+          const clipsUrl = `https://kick.com/api/v2/channels/${streamer}/clips?sort=${getSortParam(sortBy)}&time=${timeParams.kickTime}`;
           console.log(`Fetching clips from ${streamer}`);
           
           const response = await fetch(clipsUrl, {
@@ -195,7 +211,11 @@ serve(async (req) => {
           
           if (response.ok) {
             const data = await response.json();
-            return data.clips || [];
+            // Filter clips by time limit
+            const clips = (data.clips || []).filter((clip: any) => 
+              isWithinTimeLimit(clip.created_at)
+            );
+            return clips;
           }
           return [];
         } catch (e) {
@@ -224,16 +244,16 @@ serve(async (req) => {
     }
     
     // Always also fetch from general endpoint for more variety
-    if (allClips.length < 200) {
+    if (allClips.length < 300) {
       console.log('Fetching additional clips from general endpoint...');
       
-      const pagesToFetch = categorySlug ? 10 : 20; // Increased from 5/10 to 10/20
+      const pagesToFetch = categorySlug ? 15 : 30; // Increased from 10/20 to 15/30
       
       for (let page = 1; page <= pagesToFetch; page++) {
         try {
           const clipsUrl = categorySlug 
-            ? `https://kick.com/api/v2/categories/${categorySlug}/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}&page=${page}`
-            : `https://kick.com/api/v2/clips?sort=${getSortParam(sortBy)}&time=${getTimeParam(timeFilter)}&page=${page}`;
+            ? `https://kick.com/api/v2/categories/${categorySlug}/clips?sort=${getSortParam(sortBy)}&time=${timeParams.kickTime}&page=${page}`
+            : `https://kick.com/api/v2/clips?sort=${getSortParam(sortBy)}&time=${timeParams.kickTime}&page=${page}`;
           
           console.log(`Fetching page ${page}: ${clipsUrl}`);
           
@@ -254,7 +274,8 @@ serve(async (req) => {
             
             for (const clip of clips) {
               const clipId = clip.id || clip.clip_id;
-              if (!seenClipIds.has(clipId)) {
+              // Apply time filter
+              if (!seenClipIds.has(clipId) && isWithinTimeLimit(clip.created_at)) {
                 seenClipIds.add(clipId);
                 allClips.push(clip);
                 
