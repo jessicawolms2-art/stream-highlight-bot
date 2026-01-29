@@ -183,7 +183,7 @@ serve(async (req) => {
     ];
     
     // Map time filter to Kick's format and get hours for filtering
-    const getTimeParam = (filter: string): { kickTime: string; hoursLimit: number | null } => {
+    const getTimeParam = (filter: string): { kickTime: string; hoursLimit: number } => {
       switch (filter) {
         case '6h': return { kickTime: 'day', hoursLimit: 6 };
         case '12h': return { kickTime: 'day', hoursLimit: 12 };
@@ -192,21 +192,30 @@ serve(async (req) => {
         case '3days': return { kickTime: 'week', hoursLimit: 72 };
         case 'week': return { kickTime: 'week', hoursLimit: 168 };
         case '2weeks': return { kickTime: 'month', hoursLimit: 336 };
-        case 'month': return { kickTime: 'month', hoursLimit: null };
-        case 'all': return { kickTime: 'all', hoursLimit: null };
+        case 'month': return { kickTime: 'month', hoursLimit: 720 }; // ~30 days
+        case 'all': return { kickTime: 'all', hoursLimit: 999999 }; // Practically unlimited
         default: return { kickTime: 'week', hoursLimit: 168 };
       }
     };
     
     const timeParams = getTimeParam(timeFilter);
+    console.log(`Time filter: ${timeFilter} -> Kick API: ${timeParams.kickTime}, Max hours: ${timeParams.hoursLimit}`);
     
     // Helper to check if clip is within time limit
     const isWithinTimeLimit = (createdAt: string): boolean => {
-      if (!timeParams.hoursLimit) return true;
-      const clipDate = new Date(createdAt);
-      const now = new Date();
-      const diffHours = (now.getTime() - clipDate.getTime()) / (1000 * 60 * 60);
-      return diffHours <= timeParams.hoursLimit;
+      if (!createdAt) return false;
+      try {
+        const clipDate = new Date(createdAt);
+        if (isNaN(clipDate.getTime())) return false;
+        
+        const now = new Date();
+        const diffHours = (now.getTime() - clipDate.getTime()) / (1000 * 60 * 60);
+        const isValid = diffHours >= 0 && diffHours <= timeParams.hoursLimit;
+        
+        return isValid;
+      } catch {
+        return false;
+      }
     };
     
     // Map sort to Kick's format  
