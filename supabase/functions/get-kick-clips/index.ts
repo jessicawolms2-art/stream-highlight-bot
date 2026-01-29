@@ -231,11 +231,10 @@ serve(async (req) => {
     if (language === 'es') {
       console.log('Fetching clips from viral streamers...');
       
-      // Fetch clips from all viral streamers in parallel (up to 100)
-      const streamerPromises = viralStreamers.slice(0, 100).map(async (streamer: string) => {
+      // Fetch clips from all viral streamers in parallel (up to 150)
+      const streamerPromises = viralStreamers.slice(0, 150).map(async (streamer: string) => {
         try {
           const clipsUrl = `https://kick.com/api/v2/channels/${streamer}/clips?sort=${getSortParam(sortBy)}&time=${timeParams.kickTime}`;
-          console.log(`Fetching clips from ${streamer}`);
           
           const response = await fetch(clipsUrl, {
             headers: {
@@ -254,7 +253,6 @@ serve(async (req) => {
           }
           return [];
         } catch (e) {
-          console.error(`Error fetching clips from ${streamer}:`, e);
           return [];
         }
       });
@@ -279,10 +277,10 @@ serve(async (req) => {
     }
     
     // Always also fetch from general endpoint for more variety
-    if (allClips.length < 300) {
+    if (allClips.length < 500) {
       console.log('Fetching additional clips from general endpoint...');
       
-      const pagesToFetch = categorySlug ? 15 : 30; // Increased from 10/20 to 15/30
+      const pagesToFetch = categorySlug ? 25 : 50; // Increased for more clips
       
       for (let page = 1; page <= pagesToFetch; page++) {
         try {
