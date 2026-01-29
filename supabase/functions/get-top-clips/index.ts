@@ -104,6 +104,10 @@ serve(async (req) => {
 
     // Calculate time range based on filter
     const timeFilterHours: Record<string, number> = {
+      '1h': 1,
+      '2h': 2,
+      '3h': 3,
+      '6h': 6,
       '12h': 12,
       '24h': 24,
       '3d': 72,
@@ -111,6 +115,7 @@ serve(async (req) => {
       '30d': 720,
     };
     const hoursBack = timeFilterHours[timeFilter] || 24;
+    console.log(`Time filter: ${timeFilter} -> hours back: ${hoursBack}`);
 
     const startedAt = new Date();
     startedAt.setHours(startedAt.getHours() - hoursBack);
