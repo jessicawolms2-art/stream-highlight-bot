@@ -185,6 +185,10 @@ serve(async (req) => {
     // Map time filter to Kick's format and get hours for filtering
     const getTimeParam = (filter: string): { kickTime: string; hoursLimit: number } => {
       switch (filter) {
+        case '1h': return { kickTime: 'day', hoursLimit: 1 };
+        case '2h': return { kickTime: 'day', hoursLimit: 2 };
+        case '3h': return { kickTime: 'day', hoursLimit: 3 };
+        case '4h': return { kickTime: 'day', hoursLimit: 4 };
         case '6h': return { kickTime: 'day', hoursLimit: 6 };
         case '12h': return { kickTime: 'day', hoursLimit: 12 };
         case 'day': return { kickTime: 'day', hoursLimit: 24 };
