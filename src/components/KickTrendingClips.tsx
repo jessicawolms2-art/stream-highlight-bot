@@ -78,6 +78,7 @@ const KickTrendingClips = () => {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [viewedClips, setViewedClips] = useState<Set<string>>(getViewedClips);
   const [hideViewed, setHideViewed] = useState(false);
+  const [showOnlyViewed, setShowOnlyViewed] = useState(false);
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -121,9 +122,11 @@ const KickTrendingClips = () => {
     localStorage.removeItem(VIEWED_CLIPS_KEY);
   };
 
-  const filteredClips = hideViewed 
-    ? clips.filter(clip => !viewedClips.has(clip.id))
-    : clips;
+  const filteredClips = showOnlyViewed
+    ? clips.filter(clip => viewedClips.has(clip.id))
+    : hideViewed 
+      ? clips.filter(clip => !viewedClips.has(clip.id))
+      : clips;
 
   const fetchKickClips = async (reset = true, cursorOverride?: string | null) => {
     if (reset) {
@@ -311,17 +314,36 @@ const KickTrendingClips = () => {
             </Select>
           </div>
 
-          {/* Viewed clips controls */}
-          <div className="flex items-center gap-4 border-l border-border pl-3">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="hide-viewed-kick"
-                checked={hideViewed}
-                onCheckedChange={setHideViewed}
-              />
-              <Label htmlFor="hide-viewed-kick" className="text-sm text-muted-foreground cursor-pointer">
-                Ocultar vistos
-              </Label>
+          {/* View mode toggle */}
+          <div className="flex items-center gap-2 border-l border-border pl-3">
+            <div className="flex items-center gap-1 bg-secondary rounded-lg p-1">
+              <Button
+                variant={!hideViewed && !showOnlyViewed ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setHideViewed(false); setShowOnlyViewed(false); }}
+                className="h-7 text-xs"
+              >
+                Todos
+              </Button>
+              <Button
+                variant={hideViewed ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setHideViewed(true); setShowOnlyViewed(false); }}
+                className="h-7 text-xs"
+              >
+                <Eye className="h-3 w-3 mr-1" />
+                Sin ver
+              </Button>
+              <Button
+                variant={showOnlyViewed ? "default" : "ghost"}
+                size="sm"
+                onClick={() => { setShowOnlyViewed(true); setHideViewed(false); }}
+                className="h-7 text-xs"
+                disabled={viewedClips.size === 0}
+              >
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Vistos ({viewedClips.size})
+              </Button>
             </div>
             {viewedClips.size > 0 && (
               <Button
@@ -331,7 +353,7 @@ const KickTrendingClips = () => {
                 className="h-7 text-xs text-muted-foreground hover:text-destructive"
               >
                 <X className="h-3 w-3 mr-1" />
-                Limpiar ({viewedClips.size})
+                Limpiar
               </Button>
             )}
           </div>
