@@ -64,6 +64,20 @@ const TIME_FILTERS = [
 ];
 
 const VIEWED_CLIPS_KEY = 'twitch_viewed_clips';
+const VIEWED_CLIPS_DATA_KEY = 'twitch_viewed_clips_data';
+
+interface StoredClip {
+  id: string;
+  title: string;
+  broadcaster_name: string;
+  game_name: string;
+  thumbnail_url: string;
+  view_count: number;
+  duration: number;
+  created_at: string;
+  url: string;
+  embed_url: string;
+}
 
 const getViewedClips = (): Set<string> => {
   try {
@@ -74,8 +88,31 @@ const getViewedClips = (): Set<string> => {
   }
 };
 
+const getViewedClipsData = (): Map<string, StoredClip> => {
+  try {
+    const stored = localStorage.getItem(VIEWED_CLIPS_DATA_KEY);
+    if (!stored) return new Map();
+    const parsed = JSON.parse(stored);
+    return new Map(Object.entries(parsed));
+  } catch {
+    return new Map();
+  }
+};
+
 const saveViewedClips = (clips: Set<string>) => {
   localStorage.setItem(VIEWED_CLIPS_KEY, JSON.stringify([...clips]));
+};
+
+const saveViewedClipData = (clip: StoredClip) => {
+  const current = getViewedClipsData();
+  current.set(clip.id, clip);
+  localStorage.setItem(VIEWED_CLIPS_DATA_KEY, JSON.stringify(Object.fromEntries(current)));
+};
+
+const removeViewedClipData = (clipId: string) => {
+  const current = getViewedClipsData();
+  current.delete(clipId);
+  localStorage.setItem(VIEWED_CLIPS_DATA_KEY, JSON.stringify(Object.fromEntries(current)));
 };
 
 const TrendingClips = () => {
@@ -243,15 +280,28 @@ const TrendingClips = () => {
     setChannelSuggestions([]);
   };
 
-  const toggleViewedClip = (clipId: string, e: React.MouseEvent) => {
+  const toggleViewedClip = (clip: TrendingClip, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setViewedClips(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(clipId)) {
-        newSet.delete(clipId);
+      if (newSet.has(clip.id)) {
+        newSet.delete(clip.id);
+        removeViewedClipData(clip.id);
       } else {
-        newSet.add(clipId);
+        newSet.add(clip.id);
+        saveViewedClipData({
+          id: clip.id,
+          title: clip.title,
+          broadcaster_name: clip.broadcaster_name,
+          game_name: clip.game_name,
+          thumbnail_url: clip.thumbnail_url,
+          view_count: clip.view_count,
+          duration: clip.duration,
+          created_at: clip.created_at,
+          url: clip.url,
+          embed_url: clip.embed_url,
+        });
       }
       saveViewedClips(newSet);
       return newSet;
@@ -261,13 +311,25 @@ const TrendingClips = () => {
   const clearAllViewed = () => {
     setViewedClips(new Set());
     localStorage.removeItem(VIEWED_CLIPS_KEY);
+    localStorage.removeItem(VIEWED_CLIPS_DATA_KEY);
   };
 
-  const filteredClips = showOnlyViewed
-    ? clips.filter(clip => viewedClips.has(clip.id))
-    : hideViewed 
-      ? clips.filter(clip => !viewedClips.has(clip.id))
-      : clips;
+  // Get clips to display - when showing only viewed, use stored data
+  const getDisplayClips = (): TrendingClip[] => {
+    if (showOnlyViewed) {
+      const storedData = getViewedClipsData();
+      return Array.from(storedData.values()).map(clip => ({
+        ...clip,
+        language: undefined,
+      }));
+    }
+    if (hideViewed) {
+      return clips.filter(clip => !viewedClips.has(clip.id));
+    }
+    return clips;
+  };
+
+  const filteredClips = getDisplayClips();
 
   // Infinite scroll observer
   useEffect(() => {
@@ -665,7 +727,7 @@ const TrendingClips = () => {
                   <Button
                     variant={viewedClips.has(clip.id) ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={(e) => toggleViewedClip(clip.id, e)}
+                    onClick={(e) => toggleViewedClip(clip, e)}
                     className="h-7 px-2 bg-background/90 hover:bg-background"
                   >
                     {viewedClips.has(clip.id) ? (

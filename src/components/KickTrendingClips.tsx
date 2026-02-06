@@ -51,6 +51,20 @@ const SORT_OPTIONS = [
   { code: 'recent', name: 'Más recientes' },
 ];
 
+interface StoredKickClip {
+  id: string;
+  title: string;
+  broadcaster_name: string;
+  game_name: string;
+  thumbnail_url: string;
+  view_count: number;
+  duration: number;
+  created_at: string;
+  url: string;
+}
+
+const VIEWED_CLIPS_DATA_KEY = 'kick_viewed_clips_data';
+
 const getViewedClips = (): Set<string> => {
   try {
     const stored = localStorage.getItem(VIEWED_CLIPS_KEY);
@@ -60,8 +74,31 @@ const getViewedClips = (): Set<string> => {
   }
 };
 
+const getViewedClipsData = (): Map<string, StoredKickClip> => {
+  try {
+    const stored = localStorage.getItem(VIEWED_CLIPS_DATA_KEY);
+    if (!stored) return new Map();
+    const parsed = JSON.parse(stored);
+    return new Map(Object.entries(parsed));
+  } catch {
+    return new Map();
+  }
+};
+
 const saveViewedClips = (viewed: Set<string>) => {
   localStorage.setItem(VIEWED_CLIPS_KEY, JSON.stringify([...viewed]));
+};
+
+const saveViewedClipData = (clip: StoredKickClip) => {
+  const current = getViewedClipsData();
+  current.set(clip.id, clip);
+  localStorage.setItem(VIEWED_CLIPS_DATA_KEY, JSON.stringify(Object.fromEntries(current)));
+};
+
+const removeViewedClipData = (clipId: string) => {
+  const current = getViewedClipsData();
+  current.delete(clipId);
+  localStorage.setItem(VIEWED_CLIPS_DATA_KEY, JSON.stringify(Object.fromEntries(current)));
 };
 
 const KickTrendingClips = () => {
@@ -83,14 +120,26 @@ const KickTrendingClips = () => {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  const toggleViewedClip = (clipId: string, e: React.MouseEvent) => {
+  const toggleViewedClip = (clip: KickClip, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const newViewed = new Set(viewedClips);
-    if (newViewed.has(clipId)) {
-      newViewed.delete(clipId);
+    if (newViewed.has(clip.id)) {
+      newViewed.delete(clip.id);
+      removeViewedClipData(clip.id);
     } else {
-      newViewed.add(clipId);
+      newViewed.add(clip.id);
+      saveViewedClipData({
+        id: clip.id,
+        title: clip.title,
+        broadcaster_name: clip.broadcaster_name,
+        game_name: clip.game_name,
+        thumbnail_url: clip.thumbnail_url,
+        view_count: clip.view_count,
+        duration: clip.duration,
+        created_at: clip.created_at,
+        url: clip.url,
+      });
     }
     setViewedClips(newViewed);
     saveViewedClips(newViewed);
@@ -120,13 +169,26 @@ const KickTrendingClips = () => {
   const clearAllViewed = () => {
     setViewedClips(new Set());
     localStorage.removeItem(VIEWED_CLIPS_KEY);
+    localStorage.removeItem(VIEWED_CLIPS_DATA_KEY);
   };
 
-  const filteredClips = showOnlyViewed
-    ? clips.filter(clip => viewedClips.has(clip.id))
-    : hideViewed 
-      ? clips.filter(clip => !viewedClips.has(clip.id))
-      : clips;
+  // Get clips to display - when showing only viewed, use stored data
+  const getDisplayClips = (): KickClip[] => {
+    if (showOnlyViewed) {
+      const storedData = getViewedClipsData();
+      return Array.from(storedData.values()).map(clip => ({
+        ...clip,
+        embed_url: clip.url,
+        platform: 'kick',
+      }));
+    }
+    if (hideViewed) {
+      return clips.filter(clip => !viewedClips.has(clip.id));
+    }
+    return clips;
+  };
+
+  const filteredClips = getDisplayClips();
 
   const fetchKickClips = async (reset = true, cursorOverride?: string | null) => {
     if (reset) {
@@ -477,7 +539,7 @@ const KickTrendingClips = () => {
                     <Button
                       variant={isViewed ? "secondary" : "ghost"}
                       size="sm"
-                      onClick={(e) => toggleViewedClip(clip.id, e)}
+                      onClick={(e) => toggleViewedClip(clip, e)}
                       className="h-7 px-2 bg-background/90 hover:bg-background"
                     >
                       {isViewed ? (
