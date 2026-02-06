@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Gamepad2, Calendar, CheckCircle, X } from "lucide-react";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Gamepad2, Calendar, CheckCircle, X, Download } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 const VIEWED_CLIPS_KEY = 'kick_viewed_clips';
@@ -64,6 +65,7 @@ const saveViewedClips = (viewed: Set<string>) => {
 };
 
 const KickTrendingClips = () => {
+  const { toast } = useToast();
   const [clips, setClips] = useState<KickClip[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,6 +93,20 @@ const KickTrendingClips = () => {
     }
     setViewedClips(newViewed);
     saveViewedClips(newViewed);
+  };
+
+  // Download clip function - opens clipsey.com with the clip URL
+  const handleDownloadClip = (clipUrl: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const clipseyUrl = `https://clipsey.com/?url=${encodeURIComponent(clipUrl)}`;
+    window.open(clipseyUrl, '_blank', 'noopener');
+    
+    toast({
+      title: "Abriendo Clipsey",
+      description: "Se abrió Clipsey para descargar el clip.",
+    });
   };
 
   const clearAllViewed = () => {
@@ -339,86 +355,116 @@ const KickTrendingClips = () => {
             {filteredClips.map((clip, index) => {
               const isViewed = viewedClips.has(clip.id);
               return (
-                <a
+                <div
                   key={clip.id}
-                  href={clip.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className={`group relative rounded-lg overflow-hidden bg-secondary border transition-all hover:scale-[1.02] ${
                     isViewed 
                       ? 'border-muted opacity-60 hover:opacity-100' 
                       : 'border-border hover:border-[#53fc18]'
                   }`}
                 >
-                  {/* Thumbnail */}
-                  <div className="relative aspect-video">
-                    <img
-                      src={clip.thumbnail_url || '/placeholder.svg'}
-                      alt={clip.title}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/placeholder.svg';
-                      }}
-                    />
-                    {/* Viewed badge */}
-                    {isViewed && (
-                      <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-xs font-medium flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3" />
-                        Visto
+                  <a
+                    href={clip.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    {/* Thumbnail */}
+                    <div className="relative aspect-video">
+                      <img
+                        src={clip.thumbnail_url || '/placeholder.svg'}
+                        alt={clip.title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        }}
+                      />
+                      {/* Viewed badge */}
+                      {isViewed && (
+                        <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-muted text-muted-foreground text-xs font-medium flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Visto
+                        </div>
+                      )}
+                      {/* Rank badge */}
+                      {index < 3 && !isViewed && (
+                        <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          index === 0 ? 'bg-yellow-500 text-yellow-950' :
+                          index === 1 ? 'bg-gray-300 text-gray-800' :
+                          'bg-amber-600 text-amber-950'
+                        }`}>
+                          {index + 1}
+                        </div>
+                      )}
+                      {/* Duration */}
+                      <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-background/80 text-xs font-medium">
+                        {formatDuration(clip.duration)}
                       </div>
-                    )}
-                    {/* Rank badge */}
-                    {index < 3 && !isViewed && (
-                      <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                        index === 0 ? 'bg-yellow-500 text-yellow-950' :
-                        index === 1 ? 'bg-gray-300 text-gray-800' :
-                        'bg-amber-600 text-amber-950'
-                      }`}>
-                        {index + 1}
+                      {/* Views overlay */}
+                      <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-[#53fc18]/90 text-black text-xs font-medium flex items-center gap-1">
+                        <Eye className="h-3 w-3" />
+                        {formatViewCount(clip.view_count)}
                       </div>
-                    )}
-                    {/* Duration */}
-                    <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-background/80 text-xs font-medium">
-                      {formatDuration(clip.duration)}
+                      {/* Hover overlay */}
+                      <div className="absolute inset-0 bg-[#53fc18]/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                        <ExternalLink className="h-8 w-8 text-white" />
+                      </div>
                     </div>
-                    {/* Views overlay */}
-                    <div className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-[#53fc18]/90 text-black text-xs font-medium flex items-center gap-1">
-                      <Eye className="h-3 w-3" />
-                      {formatViewCount(clip.view_count)}
+                    
+                    {/* Info */}
+                    <div className="p-3">
+                      <h4 className="text-sm font-medium text-foreground line-clamp-2 mb-2 group-hover:text-[#53fc18] transition-colors">
+                        {clip.title}
+                      </h4>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="truncate max-w-[60%]">{clip.broadcaster_name}</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
+                        <span className="truncate max-w-[60%]">{clip.game_name}</span>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{getTimeAgo(clip.created_at)}</span>
+                        </div>
+                      </div>
                     </div>
+                  </a>
+                  
+                  {/* Action buttons */}
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {/* Download button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => handleDownloadClip(clip.url, e)}
+                      className="h-7 px-2 bg-background/90 hover:bg-background"
+                      title="Descargar clip"
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      Descargar
+                    </Button>
+                    
                     {/* Mark as viewed button */}
                     <Button
-                      variant="secondary"
+                      variant={isViewed ? "secondary" : "ghost"}
                       size="sm"
                       onClick={(e) => toggleViewedClip(clip.id, e)}
-                      className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity h-7 text-xs"
+                      className="h-7 px-2 bg-background/90 hover:bg-background"
                     >
-                      {isViewed ? 'Quitar' : 'Visto'}
+                      {isViewed ? (
+                        <>
+                          <X className="h-3 w-3 mr-1" />
+                          Quitar
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Visto
+                        </>
+                      )}
                     </Button>
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-[#53fc18]/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                      <ExternalLink className="h-8 w-8 text-white" />
-                    </div>
                   </div>
-                  
-                  {/* Info */}
-                  <div className="p-3">
-                    <h4 className="text-sm font-medium text-foreground line-clamp-2 mb-2 group-hover:text-[#53fc18] transition-colors">
-                      {clip.title}
-                    </h4>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="truncate max-w-[60%]">{clip.broadcaster_name}</span>
-                    </div>
-                    <div className="flex items-center justify-between mt-1 text-xs text-muted-foreground">
-                      <span className="truncate max-w-[60%]">{clip.game_name}</span>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        <span>{getTimeAgo(clip.created_at)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </a>
+                </div>
               );
             })}
           </div>

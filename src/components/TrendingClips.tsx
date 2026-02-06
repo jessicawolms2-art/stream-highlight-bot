@@ -104,44 +104,18 @@ const TrendingClips = () => {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Download clip function - extracts MP4 URL from thumbnail
+  // Download clip function - opens clipsey.com with the clip URL
   const handleDownloadClip = (clip: TrendingClip, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Twitch clip thumbnail URL format: https://clips-media-assets2.twitch.tv/AT-cm%7C{clip_id}-preview-480x272.jpg
-    // The actual video URL is: https://clips-media-assets2.twitch.tv/{clip_id}.mp4
-    // Extract from thumbnail_url
-    const thumbnailUrl = clip.thumbnail_url;
+    // Open clipsey.com with the clip URL as parameter
+    const clipseyUrl = `https://clipsey.com/?url=${encodeURIComponent(clip.url)}`;
+    window.open(clipseyUrl, '_blank', 'noopener');
     
-    // Try to extract the clip ID from various thumbnail URL formats
-    let downloadUrl = '';
-    
-    if (thumbnailUrl.includes('clips-media-assets')) {
-      // Format: https://clips-media-assets2.twitch.tv/AT-cm%7C{id}-preview-480x272.jpg
-      // or: https://clips-media-assets2.twitch.tv/{id}-preview-480x272.jpg
-      const match = thumbnailUrl.match(/clips-media-assets\d*\.twitch\.tv\/([^-]+)/);
-      if (match) {
-        const clipSlug = decodeURIComponent(match[1]);
-        downloadUrl = `https://clips-media-assets2.twitch.tv/${clipSlug}.mp4`;
-      }
-    }
-    
-    if (!downloadUrl) {
-      // Fallback: just open the clip URL
-      window.open(clip.url, '_blank', 'noopener');
-      toast({
-        title: "Abriendo clip",
-        description: "No se pudo obtener el enlace de descarga directa. Abriendo el clip en Twitch.",
-      });
-      return;
-    }
-    
-    // Open the MP4 URL directly (will trigger download or play in browser)
-    window.open(downloadUrl, '_blank', 'noopener');
     toast({
-      title: "Descargando clip",
-      description: "El clip se está descargando. Si no inicia, haz clic derecho y 'Guardar como...'",
+      title: "Abriendo Clipsey",
+      description: "Se abrió Clipsey para descargar el clip.",
     });
   };
 
