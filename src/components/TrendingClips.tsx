@@ -109,13 +109,20 @@ const TrendingClips = () => {
     e.preventDefault();
     e.stopPropagation();
     
-    // Open clipsey.com with the clip URL as parameter
-    const clipseyUrl = `https://clipsey.com/?url=${encodeURIComponent(clip.url)}`;
-    window.open(clipseyUrl, '_blank', 'noopener');
-    
-    toast({
-      title: "Abriendo Clipsey",
-      description: "Se abrió Clipsey para descargar el clip.",
+    // Open clipsey.com - user will paste the URL there
+    // Clipsey doesn't support URL parameters, so we copy to clipboard and open the site
+    navigator.clipboard.writeText(clip.url).then(() => {
+      window.open('https://clipsey.com/', '_blank', 'noopener');
+      toast({
+        title: "Enlace copiado",
+        description: "El enlace del clip se copió al portapapeles. Pégalo en Clipsey.",
+      });
+    }).catch(() => {
+      window.open('https://clipsey.com/', '_blank', 'noopener');
+      toast({
+        title: "Abriendo Clipsey",
+        description: "Copia manualmente el enlace del clip en Clipsey.",
+      });
     });
   };
 
