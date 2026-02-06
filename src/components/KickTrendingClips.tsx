@@ -100,12 +100,19 @@ const KickTrendingClips = () => {
     e.preventDefault();
     e.stopPropagation();
     
-    const clipseyUrl = `https://clipsey.com/?url=${encodeURIComponent(clipUrl)}`;
-    window.open(clipseyUrl, '_blank', 'noopener');
-    
-    toast({
-      title: "Abriendo Clipsey",
-      description: "Se abrió Clipsey para descargar el clip.",
+    // Copy URL to clipboard and open clipsey.com
+    navigator.clipboard.writeText(clipUrl).then(() => {
+      window.open('https://clipsey.com/', '_blank', 'noopener');
+      toast({
+        title: "Enlace copiado",
+        description: "El enlace del clip se copió al portapapeles. Pégalo en Clipsey.",
+      });
+    }).catch(() => {
+      window.open('https://clipsey.com/', '_blank', 'noopener');
+      toast({
+        title: "Abriendo Clipsey",
+        description: "Copia manualmente el enlace del clip en Clipsey.",
+      });
     });
   };
 
