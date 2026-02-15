@@ -13,21 +13,19 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const { 
-      action, query, 
-      // Support both old single values and new arrays
+    const {
+      action, query,
       language, languages,
-      limit = 20, cursor, 
+      limit = 40, cursor,
       gameId, gameIds,
-      timeFilter = '24h', 
-      broadcasterName, broadcasterNames 
+      timeFilter = '24h',
+      broadcasterName, broadcasterNames
     } = body;
-    
-    // Normalize to arrays
+
     const langList: string[] = languages || (language ? [language] : ['es']);
     const gameIdList: string[] = gameIds || (gameId && gameId !== 'all' ? [gameId] : []);
     const broadcasterNameList: string[] = broadcasterNames || (broadcasterName ? [broadcasterName] : []);
-    
+
     const TWITCH_CLIENT_ID = Deno.env.get('TWITCH_CLIENT_ID');
     const TWITCH_CLIENT_SECRET = Deno.env.get('TWITCH_CLIENT_SECRET');
 
@@ -35,7 +33,6 @@ serve(async (req) => {
       throw new Error('Twitch credentials not configured');
     }
 
-    // Get OAuth token
     const tokenResponse = await fetch('https://id.twitch.tv/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -60,14 +57,14 @@ serve(async (req) => {
       const searchUrl = `https://api.twitch.tv/helix/search/channels?query=${encodeURIComponent(query)}&first=10&live_only=false`;
       const searchResponse = await fetch(searchUrl, { headers: twitchHeaders });
       const searchData = await searchResponse.json();
-      
+
       const channels = (searchData.data || []).map((ch: any) => ({
         id: ch.id, broadcaster_login: ch.broadcaster_login,
         display_name: ch.display_name, thumbnail_url: ch.thumbnail_url,
         is_live: ch.is_live, game_name: ch.game_name || '',
         title: ch.title || '', started_at: ch.started_at || '',
       }));
-      
+
       return new Response(
         JSON.stringify({ success: true, channels }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -83,23 +80,25 @@ serve(async (req) => {
     startedAt.setHours(startedAt.getHours() - hoursBack);
 
     // Get top games
-    const gamesResponse = await fetch('https://api.twitch.tv/helix/games/top?first=50', { headers: twitchHeaders });
+    const gamesResponse = await fetch('https://api.twitch.tv/helix/games/top?first=100', { headers: twitchHeaders });
     const gamesData = await gamesResponse.json();
     const topGames = gamesData.data || [];
 
     console.log(`Fetching clips - languages: ${langList}, gameIds: ${gameIdList}, timeFilter: ${timeFilter}, broadcasters: ${broadcasterNameList}`);
 
-    // If filtering by broadcasters, resolve all broadcaster IDs
+    const startTime = Date.now();
+    const TIME_BUDGET_MS = 25000;
+
+    // If filtering by broadcasters
     if (broadcasterNameList.length > 0) {
       const allClips: any[] = [];
-      
-      // Resolve all broadcaster IDs in parallel
+
       const broadcasterPromises = broadcasterNameList.map(async (name: string) => {
         const searchUrl = `https://api.twitch.tv/helix/search/channels?query=${encodeURIComponent(name)}&first=1`;
         const searchResponse = await fetch(searchUrl, { headers: twitchHeaders });
         const searchData = await searchResponse.json();
         if (searchData.data && searchData.data.length > 0) {
-          const exactMatch = searchData.data.find((ch: any) => 
+          const exactMatch = searchData.data.find((ch: any) =>
             ch.broadcaster_login.toLowerCase() === name.toLowerCase() ||
             ch.display_name.toLowerCase() === name.toLowerCase()
           );
@@ -107,24 +106,24 @@ serve(async (req) => {
         }
         return null;
       });
-      
+
       const broadcasterIds = (await Promise.all(broadcasterPromises)).filter(Boolean) as string[];
-      
-      // Fetch clips from all broadcasters in parallel
+
       const clipPromises = broadcasterIds.map(async (bId: string) => {
         const clips: any[] = [];
         let clipCursor: string | undefined;
-        for (let page = 0; page < 10; page++) {
+        for (let page = 0; page < 15; page++) {
+          if (Date.now() - startTime > TIME_BUDGET_MS) break;
           const url = new URL('https://api.twitch.tv/helix/clips');
           url.searchParams.set('broadcaster_id', bId);
           url.searchParams.set('first', '100');
           url.searchParams.set('started_at', startedAt.toISOString());
           if (clipCursor) url.searchParams.set('after', clipCursor);
-          
+
           const resp = await fetch(url.toString(), { headers: twitchHeaders });
           const data = await resp.json();
           if (!data.data || data.data.length === 0) break;
-          
+
           for (const clip of data.data) {
             clips.push({ ...clip, game_name: topGames.find((g: any) => g.id === clip.game_id)?.name || 'Unknown' });
           }
@@ -133,23 +132,22 @@ serve(async (req) => {
         }
         return clips;
       });
-      
+
       const results = await Promise.all(clipPromises);
       for (const clips of results) allClips.push(...clips);
-      
-      // Filter by gameIds if specified
+
       let filtered = allClips;
       if (gameIdList.length > 0) {
         filtered = filtered.filter(c => gameIdList.includes(c.game_id));
       }
-      
+
       filtered.sort((a, b) => b.view_count - a.view_count);
-      
+
       const startIndex = cursor ? parseInt(cursor, 10) : 0;
       const endIndex = startIndex + limit;
       const paginatedClips = filtered.slice(startIndex, endIndex);
       const nextCursor = endIndex < filtered.length ? endIndex.toString() : null;
-      
+
       const formattedClips = paginatedClips.map((clip: any) => ({
         id: clip.id, title: clip.title, broadcaster_name: clip.broadcaster_name,
         game_name: clip.game_name || 'Unknown', thumbnail_url: clip.thumbnail_url,
@@ -170,42 +168,40 @@ serve(async (req) => {
     // General clip fetching
     const gamesToFetch = gameIdList.length > 0
       ? gameIdList.map(id => ({ id, name: topGames.find((g: any) => g.id === id)?.name || 'Unknown' }))
-      : topGames.slice(0, 40);
-    
+      : topGames.slice(0, 60);
+
     const allClips: any[] = [];
     const broadcasterIds = new Set<string>();
     const seenClipIds = new Set<string>();
-    
-    const startTime = Date.now();
-    const TIME_BUDGET_MS = 22000;
-    const MAX_PAGES_PER_GAME = gameIdList.length > 0 ? 20 : 5;
-    const MAX_TOTAL_CLIPS = 5000;
-    const BATCH_SIZE = 5;
-    
+
+    const MAX_PAGES_PER_GAME = gameIdList.length > 0 ? 25 : 8;
+    const MAX_TOTAL_CLIPS = 8000;
+    const BATCH_SIZE = 8;
+
     for (let batchStart = 0; batchStart < gamesToFetch.length; batchStart += BATCH_SIZE) {
       if (Date.now() - startTime > TIME_BUDGET_MS || allClips.length >= MAX_TOTAL_CLIPS) break;
-      
+
       const gameBatch = gamesToFetch.slice(batchStart, batchStart + BATCH_SIZE);
-      
+
       const batchPromises = gameBatch.map(async (game: { id: string; name: string }) => {
         const gameClips: any[] = [];
         let gameCursor: string | undefined;
         let pageCount = 0;
-        
+
         try {
           while (pageCount < MAX_PAGES_PER_GAME) {
             if (Date.now() - startTime > TIME_BUDGET_MS) break;
-            
+
             const url = new URL('https://api.twitch.tv/helix/clips');
             url.searchParams.set('game_id', game.id);
             url.searchParams.set('first', '100');
             url.searchParams.set('started_at', startedAt.toISOString());
             if (gameCursor) url.searchParams.set('after', gameCursor);
-            
+
             const resp = await fetch(url.toString(), { headers: twitchHeaders });
             const data = await resp.json();
             if (!data.data || data.data.length === 0) break;
-            
+
             for (const clip of data.data) gameClips.push({ ...clip, game_name: game.name });
             pageCount++;
             gameCursor = data.pagination?.cursor;
@@ -216,7 +212,7 @@ serve(async (req) => {
         }
         return gameClips;
       });
-      
+
       const batchResults = await Promise.all(batchPromises);
       for (const gameClips of batchResults) {
         for (const clip of gameClips) {
@@ -228,14 +224,15 @@ serve(async (req) => {
         }
       }
     }
-    
-    console.log('Total clips fetched:', allClips.length);
-    
+
+    console.log(`Total clips fetched: ${allClips.length}, time: ${Date.now() - startTime}ms`);
+
     // Get broadcaster languages
     const broadcasterIdsArray = Array.from(broadcasterIds);
     const broadcasterLanguages: Record<string, string> = {};
-    
+
     for (let i = 0; i < broadcasterIdsArray.length; i += 100) {
+      if (Date.now() - startTime > TIME_BUDGET_MS + 3000) break;
       const batch = broadcasterIdsArray.slice(i, i + 100);
       const idsParam = batch.map(id => `broadcaster_id=${id}`).join('&');
       try {
@@ -248,8 +245,8 @@ serve(async (req) => {
         console.error('Error fetching broadcaster info:', e);
       }
     }
-    
-    // Filter by languages (support multiple)
+
+    // Filter by languages
     const filteredClips = allClips.filter(clip => {
       const lang = broadcasterLanguages[clip.broadcaster_id];
       if (langList.includes('all') || langList.length === 0) return true;
@@ -259,16 +256,16 @@ serve(async (req) => {
         return lang === l;
       });
     });
-    
-    console.log(`Clips in ${langList}:`, filteredClips.length);
-    
+
+    console.log(`Clips in ${langList}: ${filteredClips.length}`);
+
     filteredClips.sort((a, b) => b.view_count - a.view_count);
-    
+
     const startIndex = cursor ? parseInt(cursor, 10) : 0;
     const endIndex = startIndex + limit;
     const paginatedClips = filteredClips.slice(startIndex, endIndex);
     const nextCursor = endIndex < filteredClips.length ? endIndex.toString() : null;
-    
+
     const formattedClips = paginatedClips.map((clip: any) => ({
       id: clip.id, title: clip.title, broadcaster_name: clip.broadcaster_name,
       game_name: clip.game_name || 'Unknown', thumbnail_url: clip.thumbnail_url,
