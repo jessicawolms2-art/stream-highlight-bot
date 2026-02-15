@@ -174,7 +174,7 @@ const TrendingClips = () => {
       const { data, error } = await supabase.functions.invoke('get-top-clips', {
         body: { 
           languages: selectedLanguages.length > 0 ? selectedLanguages : ['all'],
-          limit: 20,
+          limit: 40,
           cursor: cursorToUse,
           gameIds: selectedGameIds.length > 0 ? selectedGameIds : undefined,
           timeFilter,

@@ -252,7 +252,7 @@ const KickTrendingClips = () => {
           categorySlugs: selectedCategories.length > 0 ? selectedCategories : undefined,
           sortBy,
           timeFilter,
-          limit: 20,
+          limit: 40,
           cursor: cursorToUse,
           languages: selectedLanguages.length > 0 ? selectedLanguages : ['es'],
           streamerNames: streamerNames.length > 0 ? streamerNames : undefined,
