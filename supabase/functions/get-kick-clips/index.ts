@@ -13,30 +13,45 @@ const kickHeaders = {
 
 // Language-specific streamer lists
 const spanishStreamers = [
+  // España - grandes
   'auronplay', 'ibai', 'elxokas', 'illojuan', 'rubius', 'thegrefg',
+  'alexby11', 'willyrex', 'gerardromero', 'davidguapo', 'jordiwild',
+  'cheeto', 'zeling', 'werlyb', 'knekro', 'reborn', 'carola', 'cristinini',
+  'silithur', 'byviruzz', 'paracetamor', 'zorman', 'mrgranbomba',
+  'elmillor', 'momo', 'biyin', 'orslok', 'perxitaa', 'elspsjordi', 'djmariio',
+  'ibelky', 'elvisitoo', 'shadoune666', 'kenai', 'luzugames', 'staxx',
+  'axozer', 'montanito', 'rakon', 'fargan', 'wismichu', 'lolito', 'polispol',
+  'folagor', 'mangelrogel', 'duxo', 'luzu', 'town', 'danirep',
+  'windygirk', 'clavicular', 'thenexxx', 'ampeterby7', 'mayichi',
+  'jaggerprincesa', 'elded', 'llados', 'xfarganx',
+  // España - mid tier
+  'sprintman', 'slakun10', 'xpekeoriginal', 'mangel', 'outconsumer',
+  'bazaga', 'elrubius', 'djmario', 'punisher_es', 'wakkyjabber',
+  'heretics', 'papi_streamer', 'goorgo', 'grefg', 'rafita',
+  'kefran', 'loinaz', 'desahogo', 'elanibal', 'byebyesel',
+  'adra_diente', 'thewalker00', 'lauty_gr', 'bycalixto', 'missasinfonia',
+  // Latam
   'juansguarnizo', 'rivers_gg', 'westcol', 'arigameplays', 'elmariana',
   'fernanfloo', 'ded', 'roier', 'quackity', 'vegetta777',
-  'alexby11', 'willyrex', 'ampeterby7', 'elded', 'gerardromero',
-  'davidguapo', 'jordiwild', 'llados', 'cheeto', 'zeling', 'werlyb',
-  'knekro', 'reborn', 'mayichi', 'jaggerprincesa', 'carola', 'cristinini',
-  'silithur', 'byviruzz', 'paracetamor', 'zorman', 'mrgranbomba',
-  'elmillor', 'spreen', 'coscu', 'momo', 'frankkaster',
-  'biyin', 'orslok', 'perxitaa', 'elspsjordi', 'djmariio',
-  'ibelky', 'elvisitoo', 'xfarganx', 'shadoune666', 'kenai',
-  'luzugames', 'staxx', 'windygirk', 'axozer', 'montanito',
-  'rakon', 'fargan', 'wismichu', 'lolito', 'polispol', 'folagor',
-  'mangelrogel', 'duxo', 'luzu', 'town', 'danirep',
-  'robleis', 'demente', 'juegagerman',
-  'werevertumorro', 'luisitocomunica', 'dross', 'thedonato',
-  'clavicular', 'thenexxx', 'rivers',
+  'spreen', 'coscu', 'frankkaster', 'robleis', 'demente', 'juegagerman',
+  'werevertumorro', 'luisitocomunica', 'dross', 'thedonato', 'rivers',
+  'jukijordi', 'yosoylui', 'piker', 'naadro', 'peiitogame',
+  'acros99', 'marianeka', 'germangarmendia', 'lokillo', 'missa',
+  'flako', 'papigavi', 'cxlvxn', 'exequielk', 'lauter',
+  'goniiaa', 'nickfros', 'missclick', 'grefg_official', 'konekta',
+  'gusgri', 'faramaox', 'palako', 'pandaancha', 'tobiasxd',
+  'zxuno', 'mxm_97', 'thekela', 'rivero', 'wos_live',
+  'tatary', 'elonoxd', 'bycalixto', 'nadie_bro', 'elprofe',
+  'felipao', 'gonmaro', 'bromas_pesadas', 'chezina', 'soakyermouth',
 ];
 
 const englishStreamers = [
+  // Mega streamers
   'ishowspeed', 'kaicenat', 'xqc', 'adin', 'adinross', 'sketch', 'jynxzi',
   'caseoh', 'caseoh_', 'nickmercs', 'hasanabi', 'amouranth', 'pokimane',
   'tenz', 'shroud', 'ninja', 'tfue', 'faze_swagg', 'clix', 'ronaldo',
-  'trainwreckstv', 'roshtein', 'stakef1red', 'corinnakopf', 'mizkif',
-  'nmplol', 'sodapoppin', 'erobb221', 'emiru', 'fanfan', 'valkyrae',
+  'trainwreckstv', 'roshtein', 'corinnakopf', 'mizkif',
+  'nmplol', 'sodapoppin', 'erobb221', 'emiru', 'valkyrae',
   'disguisedtoast', 'sykkuno', 'fuslie', 'lilypichu', 'qtcinderella',
   'moistcr1tikal', 'ludwig', 'atrioc', 'clintstevens', 'yassuo',
   'lacy', 'plaqueboymax', 'duke_dennis', 'agent00', 'yourragegaming',
@@ -44,16 +59,71 @@ const englishStreamers = [
   'timthetatman', 'summit1g', 'lirik', 'cohhcarnage',
   'moonmoon', 'forsen', 'nymn', 'esfand', 'tectone',
   'rampagejackson', 'destiny', 'asmongold', 'cdotblam',
+  // Mid tier
+  'kai_cenat', 'itssliker', 'stakes', 'trainwracks', 'roshtein_',
+  'nadia', 'alinity', 'fanfan', 'jericho', 'bawkbasoup',
+  'lacari', 'rex_enjoyer', 'darealshooter', 'johnnysins', 'trymacs',
+  'myntfps', 'froste', 'hasan', 'charlieputh', 'willneff',
+  'poke', 'legend', 'fps_shaka', 'n0thing', 'ohnePixel',
+  'anomaly', 'warowl', 'thoomoo', 'jakenbake', 'philza',
+  'tubbo', 'ranboo', 'tommyinnit', 'wilbursoot', 'quackityhq',
+  'technoblade', 'dream', 'georgenotfound', 'sapnap', 'badboyhalo',
+  'jschlatt', 'nihachu', 'eret', 'foolish_gamers', 'hannahxxrose',
+  'purpled', 'antfrost', 'connoreatspants', 'michaelmreeves', 'rtgame',
+  'callmecarson', 'slimecicle', 'smajor1995', 'captainsparklez', 'seapeekay',
+  'krtzyy', 'nymn', 'nani', 'blaustoise', 'gmhikaru',
+  'botezlive', 'andreabot', 'chessbrah', 'eric_hansen', 'alexandradanilova',
+  'octavian', 'tyler1', 'imaqtpie', 'doublelift', 'sneakylol',
+  'cloak', 'couragejd', 'drdisrespect', 'nickeh30', 'sypherpk',
+  'mongraal', 'benjyfishy', 'airwaks', 'noahreyli', 'av0idance_gg',
 ];
 
 const portugueseStreamers = [
+  // Brasil - grandes
   'casimito', 'gaules', 'loud_coringa', 'baiano', 'yoda', 'cellbit',
   'felps', 'liminha', 'msjp', 'pfrancob', 'meduska',
+  'alanzoka', 'coreano', 'gaulesdota', 'flakes_power', 'nobru',
+  'rakin', 'brtt', 'snapback', 'tec_play', 'evelyn_celeste',
+  'k1ng_mango', 'loud_thurzin', 'loud_lipe', 'aspaszin', 'chelo_lol',
+  // Mid tier
+  'shady_zy', 'lendario2k', 'thiago_lira', 'jukes', 'pedrinhobom',
+  'lucas1', 'leozinn', 'v1centhoo', 'mafer', 'vinizinhoo',
+  'saadhak', 'bstrdd', 'drufinha', 'funkyg', 'paco_plays',
+  'kayovz', 'juliobrcr', 'ruxic', 'farias_h', 'godoygab',
+  'crvk', 'pedrinhobr', 'saulohenry', 'xandao_rpg', 'mith',
+  'sheymuv', 'pandafx', 'guiguiplay', 'nicolasmagalhaes', 'letsgo_jr',
 ];
 
 const frenchStreamers = [
+  // Grandes
   'squeezie', 'domingo', 'gotaga', 'mickalow', 'blitzstream',
   'joueur_du_grenier', 'antoinedaniell', 'zerator',
+  'alphacast', 'deujna', 'okocat', 'solary', 'kameto',
+  'rivenpaints', 'ponce', 'ultia', 'sardoche', 'mynthos',
+  // Mid tier
+  'siphano', 'antoinefb', 'doigby', 'alderiate', 'antoine_flow',
+  'cookiefr', 'bakapym', 'inoxia', 'sosopro', 'narkuss',
+  'lebouseuh', 'yuzux', 'skyyart', 'xari', 'alohastream',
+  'exiion', 'shaunz', 'darkvipersag', 'lirik_fr', 'locklear',
+];
+
+const germanStreamers = [
+  'trymacs', 'papaplatte', 'knossi', 'rewinside', 'gronkh',
+  'dner', 'hasbi', 'maximilian_', 'ungespielt', 'gnu',
+  'florentin', 'amar', 'gernstl', 'pietsmiet', 'sturmwaffel',
+  'rumathra', 'ramuneliit', 'fabiank', 'elotrix', 'bonjwa',
+  'mangobaum', 'karaoke_de', 'fitty', 'lautenschlaeger', 'thilo_b',
+];
+
+const koreanStreamers = [
+  'lck_global', 'faker', 'gumayusi', 'keria', 'oner', 'zeus',
+  'chovy', 'lehends', 'showmaker', 'ruler', 'canyon',
+  'bdd', 'pyosik', 'viper_lol', 'deft', 'beryl',
+];
+
+const russianStreamers = [
+  'buster', 'papich', 'mellstroy', 'twitchru', 'ubirock',
+  'evelone192', 'segall', 'lizzard', 'alloha_stream', 'fortniterus',
 ];
 
 const streamersByLang: Record<string, string[]> = {
@@ -61,6 +131,9 @@ const streamersByLang: Record<string, string[]> = {
   en: englishStreamers,
   pt: portugueseStreamers,
   fr: frenchStreamers,
+  de: germanStreamers,
+  ko: koreanStreamers,
+  ru: russianStreamers,
 };
 
 serve(async (req) => {
