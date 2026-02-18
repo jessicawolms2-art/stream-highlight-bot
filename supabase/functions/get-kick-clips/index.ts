@@ -11,7 +11,7 @@ const kickHeaders = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 };
 
-// Spanish-speaking streamers
+// Language-specific streamer lists
 const spanishStreamers = [
   'auronplay', 'ibai', 'elxokas', 'illojuan', 'rubius', 'thegrefg',
   'juansguarnizo', 'rivers_gg', 'westcol', 'arigameplays', 'elmariana',
@@ -28,9 +28,9 @@ const spanishStreamers = [
   'mangelrogel', 'duxo', 'luzu', 'town', 'danirep',
   'robleis', 'demente', 'juegagerman',
   'werevertumorro', 'luisitocomunica', 'dross', 'thedonato',
+  'clavicular', 'thenexxx', 'rivers',
 ];
 
-// English-speaking streamers
 const englishStreamers = [
   'ishowspeed', 'kaicenat', 'xqc', 'adin', 'adinross', 'sketch', 'jynxzi',
   'caseoh', 'caseoh_', 'nickmercs', 'hasanabi', 'amouranth', 'pokimane',
@@ -43,18 +43,24 @@ const englishStreamers = [
   'sneako', 'piratesoftware', 'theprimeagen',
   'timthetatman', 'summit1g', 'lirik', 'cohhcarnage',
   'moonmoon', 'forsen', 'nymn', 'esfand', 'tectone',
+  'rampagejackson', 'destiny', 'asmongold', 'cdotblam',
 ];
 
-// Portuguese streamers
 const portugueseStreamers = [
   'casimito', 'gaules', 'loud_coringa', 'baiano', 'yoda', 'cellbit',
-  'felps', 'liminha', 'msjp', 'pfrancob',
+  'felps', 'liminha', 'msjp', 'pfrancob', 'meduska',
+];
+
+const frenchStreamers = [
+  'squeezie', 'domingo', 'gotaga', 'mickalow', 'blitzstream',
+  'joueur_du_grenier', 'antoinedaniell', 'zerator',
 ];
 
 const streamersByLang: Record<string, string[]> = {
   es: spanishStreamers,
   en: englishStreamers,
   pt: portugueseStreamers,
+  fr: frenchStreamers,
 };
 
 serve(async (req) => {
@@ -69,12 +75,14 @@ serve(async (req) => {
       categorySlug, categorySlugs,
       sortBy = 'view', timeFilter = 'week',
       limit = 40, cursor,
-      language = 'es', languages,
+      language, languages,
       streamerNames,
     } = body;
 
     const catList: string[] = categorySlugs || (categorySlug && categorySlug !== 'all' ? [categorySlug] : []);
-    const langList: string[] = languages || (language ? [language] : ['es']);
+    const langList: string[] = languages && languages.length > 0
+      ? languages
+      : (language ? [language] : ['es']);
     const streamerList: string[] = streamerNames || [];
 
     // Handle channel search
@@ -122,6 +130,8 @@ serve(async (req) => {
         });
       }
     }
+
+    const needsAllLangs = langList.includes('all') || langList.length === 0;
 
     console.log(`Fetching Kick clips - categories: ${catList}, sort: ${sortBy}, time: ${timeFilter}, languages: ${langList}, streamers: ${streamerList}`);
 
@@ -200,7 +210,7 @@ serve(async (req) => {
       return clips;
     };
 
-    // 1. If specific streamers requested, fetch from them
+    // CASE 1: Specific streamers requested
     if (streamerList.length > 0) {
       console.log(`Fetching clips from ${streamerList.length} specific streamers`);
       for (let i = 0; i < streamerList.length; i += BATCH_SIZE) {
@@ -209,10 +219,11 @@ serve(async (req) => {
         const results = await Promise.all(batch.map(fetchStreamerClips));
         for (const clips of results) clips.forEach(addClip);
       }
+      console.log(`Specific streamer clips: ${allClips.length}`);
     }
 
-    // 2. If categories specified, fetch from category endpoints
-    if (catList.length > 0 && streamerList.length === 0) {
+    // CASE 2: Category filter (with or without language) - fetch from category endpoint
+    if (catList.length > 0) {
       console.log(`Fetching clips from ${catList.length} categories`);
       for (const cat of catList) {
         if (Date.now() - startTime > TIME_BUDGET_MS) break;
@@ -222,20 +233,18 @@ serve(async (req) => {
       console.log(`Category clips: ${allClips.length}`);
     }
 
-    // 3. Fetch from language-specific viral streamers (batched with time budget)
-    if (streamerList.length === 0) {
-      // Build streamer list based on selected languages
+    // CASE 3: No specific streamers AND no categories → fetch from language streamers + general
+    if (streamerList.length === 0 && catList.length === 0) {
+      // Build streamer pool from selected languages
       const streamersToFetch: string[] = [];
-      for (const lang of langList) {
-        if (lang === 'all' || lang === '') {
-          // Add all known streamers
-          for (const list of Object.values(streamersByLang)) streamersToFetch.push(...list);
-          break;
+      if (needsAllLangs) {
+        for (const list of Object.values(streamersByLang)) streamersToFetch.push(...list);
+      } else {
+        for (const lang of langList) {
+          const list = streamersByLang[lang];
+          if (list) streamersToFetch.push(...list);
         }
-        const list = streamersByLang[lang];
-        if (list) streamersToFetch.push(...list);
       }
-      // Deduplicate
       const uniqueStreamers = [...new Set(streamersToFetch)];
 
       if (uniqueStreamers.length > 0) {
@@ -248,37 +257,65 @@ serve(async (req) => {
         }
         console.log(`Streamer clips: ${allClips.length}`);
       }
-    }
 
-    // 4. Fill from general endpoint if still low
-    if (allClips.length < 200 && streamerList.length === 0 && catList.length === 0) {
-      console.log('Fetching additional clips from general endpoint...');
-      for (let page = 1; page <= 30; page++) {
-        if (Date.now() - startTime > TIME_BUDGET_MS) break;
-        try {
-          const url = `https://kick.com/api/v2/clips?sort=${getSortParam(sortBy)}&time=${timeParams.kickTime}&page=${page}`;
-          const resp = await fetch(url, { headers: kickHeaders });
-          if (!resp.ok) break;
-          const data = await resp.json();
-          const pageClips = data.clips || data.data || [];
-          if (pageClips.length === 0) break;
-          for (const c of pageClips) {
-            if (isWithinTimeLimit(c.created_at)) addClip(c);
-          }
-        } catch { break; }
+      // Fill from general endpoint if still low
+      if (allClips.length < 200) {
+        console.log('Fetching additional clips from general endpoint...');
+        for (let page = 1; page <= 30; page++) {
+          if (Date.now() - startTime > TIME_BUDGET_MS) break;
+          try {
+            const url = `https://kick.com/api/v2/clips?sort=${getSortParam(sortBy)}&time=${timeParams.kickTime}&page=${page}`;
+            const resp = await fetch(url, { headers: kickHeaders });
+            if (!resp.ok) break;
+            const data = await resp.json();
+            const pageClips = data.clips || data.data || [];
+            if (pageClips.length === 0) break;
+            for (const c of pageClips) {
+              if (isWithinTimeLimit(c.created_at)) addClip(c);
+            }
+          } catch { break; }
+        }
+        console.log(`After general: ${allClips.length}`);
       }
-      console.log(`After general: ${allClips.length}`);
     }
 
     console.log(`Total clips collected: ${allClips.length}, time: ${Date.now() - startTime}ms`);
 
-    // Filter by categories if clips came from streamers/general
+    // Apply filters
     let filteredClips = allClips;
+
+    // Filter by category if streamers were fetched but category was also selected
     if (catList.length > 0 && streamerList.length > 0) {
       filteredClips = filteredClips.filter(clip => {
         const catSlug = clip.category?.slug;
-        return catSlug && catList.includes(catSlug);
+        return catSlug && catList.some(c => catSlug === c || catSlug.includes(c) || c.includes(catSlug));
       });
+    }
+
+    // Filter by language when using streamer clips with no streamer filter
+    // (language streamers already give language, but general endpoint needs filtering)
+    // For category clips: try to filter by channel language if possible
+    // We use the streamer slug to match against known language lists
+    if (!needsAllLangs && catList.length > 0 && streamerList.length === 0) {
+      // Build set of streamers per language for fast lookup
+      const allowedStreamers = new Set<string>();
+      for (const lang of langList) {
+        const list = streamersByLang[lang];
+        if (list) list.forEach(s => allowedStreamers.add(s.toLowerCase()));
+      }
+      // Only filter if we have known streamers for the selected languages
+      if (allowedStreamers.size > 0) {
+        const beforeCount = filteredClips.length;
+        const langFiltered = filteredClips.filter(clip => {
+          const channelSlug = (clip.channel?.slug || clip.channel?.username || '').toLowerCase();
+          return allowedStreamers.has(channelSlug);
+        });
+        // Only apply language filter from categories if it doesn't remove everything
+        if (langFiltered.length > 0) {
+          filteredClips = langFiltered;
+        }
+        console.log(`Language filter on category clips: ${beforeCount} -> ${filteredClips.length}`);
+      }
     }
 
     // Sort
@@ -303,7 +340,7 @@ serve(async (req) => {
       view_count: clip.views || clip.view_count || 0,
       duration: clip.duration || 0,
       created_at: clip.created_at || new Date().toISOString(),
-      url: clip.clip_url ? `https://kick.com/${clip.channel?.slug || 'clip'}?clip=${clip.id}` : `https://kick.com/clip/${clip.id}`,
+      url: `https://kick.com/${clip.channel?.slug || clip.channel?.username || 'clip'}?clip=${clip.id || clip.clip_id}`,
       embed_url: clip.clip_url || clip.video_url || '',
       platform: 'kick',
     }));
