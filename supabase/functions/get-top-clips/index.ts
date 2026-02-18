@@ -22,9 +22,14 @@ serve(async (req) => {
       broadcasterName, broadcasterNames
     } = body;
 
-    const langList: string[] = languages || (language ? [language] : ['es']);
+    // Normalize arrays
+    const langList: string[] = languages && languages.length > 0
+      ? languages
+      : (language ? [language] : []);
     const gameIdList: string[] = gameIds || (gameId && gameId !== 'all' ? [gameId] : []);
     const broadcasterNameList: string[] = broadcasterNames || (broadcasterName ? [broadcasterName] : []);
+
+    const needsAllLangs = langList.length === 0 || langList.includes('all');
 
     const TWITCH_CLIENT_ID = Deno.env.get('TWITCH_CLIENT_ID');
     const TWITCH_CLIENT_SECRET = Deno.env.get('TWITCH_CLIENT_SECRET');
@@ -89,12 +94,12 @@ serve(async (req) => {
     const startTime = Date.now();
     const TIME_BUDGET_MS = 25000;
 
-    // If filtering by broadcasters
+    // If filtering by specific broadcasters
     if (broadcasterNameList.length > 0) {
       const allClips: any[] = [];
 
       const broadcasterPromises = broadcasterNameList.map(async (name: string) => {
-        const searchUrl = `https://api.twitch.tv/helix/search/channels?query=${encodeURIComponent(name)}&first=1`;
+        const searchUrl = `https://api.twitch.tv/helix/search/channels?query=${encodeURIComponent(name)}&first=5`;
         const searchResponse = await fetch(searchUrl, { headers: twitchHeaders });
         const searchData = await searchResponse.json();
         if (searchData.data && searchData.data.length > 0) {
@@ -140,6 +145,26 @@ serve(async (req) => {
       if (gameIdList.length > 0) {
         filtered = filtered.filter(c => gameIdList.includes(c.game_id));
       }
+      // Apply language filter if specified for broadcaster clips
+      if (!needsAllLangs) {
+        // Fetch broadcaster languages
+        const bIds = [...new Set(filtered.map(c => c.broadcaster_id))];
+        const bLangs: Record<string, string> = {};
+        for (let i = 0; i < bIds.length; i += 100) {
+          const batch = bIds.slice(i, i + 100);
+          const idsParam = batch.map(id => `broadcaster_id=${id}`).join('&');
+          try {
+            const resp = await fetch(`https://api.twitch.tv/helix/channels?${idsParam}`, { headers: twitchHeaders });
+            const data = await resp.json();
+            for (const ch of data.data || []) bLangs[ch.broadcaster_id] = ch.broadcaster_language;
+          } catch {}
+        }
+        filtered = filtered.filter(c => {
+          const lang = bLangs[c.broadcaster_id];
+          if (!lang) return false;
+          return langList.some(l => lang === l || lang.startsWith(l + '-'));
+        });
+      }
 
       filtered.sort((a, b) => b.view_count - a.view_count);
 
@@ -159,13 +184,13 @@ serve(async (req) => {
         JSON.stringify({
           success: true, clips: formattedClips,
           games: topGames.map((g: any) => ({ id: g.id, name: g.name })),
-          totalFound: filtered.length, nextCursor, language: langList,
+          totalFound: filtered.length, nextCursor,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // General clip fetching
+    // General clip fetching: fetch by game
     const gamesToFetch = gameIdList.length > 0
       ? gameIdList.map(id => ({ id, name: topGames.find((g: any) => g.id === id)?.name || 'Unknown' }))
       : topGames.slice(0, 60);
@@ -227,7 +252,7 @@ serve(async (req) => {
 
     console.log(`Total clips fetched: ${allClips.length}, time: ${Date.now() - startTime}ms`);
 
-    // Get broadcaster languages
+    // Fetch broadcaster languages for all unique broadcasters
     const broadcasterIdsArray = Array.from(broadcasterIds);
     const broadcasterLanguages: Record<string, string> = {};
 
@@ -248,12 +273,12 @@ serve(async (req) => {
 
     // Filter by languages
     const filteredClips = allClips.filter(clip => {
+      if (needsAllLangs) return true;
       const lang = broadcasterLanguages[clip.broadcaster_id];
-      if (langList.includes('all') || langList.length === 0) return true;
       if (!lang) return false;
       return langList.some(l => {
         if (l === 'es') return lang === 'es' || lang.startsWith('es-') || lang === 'spanish';
-        return lang === l;
+        return lang === l || lang.startsWith(l + '-');
       });
     });
 
@@ -278,7 +303,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true, clips: formattedClips,
         games: topGames.map((g: any) => ({ id: g.id, name: g.name })),
-        totalFound: filteredClips.length, nextCursor, language: langList,
+        totalFound: filteredClips.length, nextCursor,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
