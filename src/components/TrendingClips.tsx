@@ -311,6 +311,11 @@ const TrendingClips = () => {
     if (sortBy === 'recent') {
       result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     } else {
+      // Filter out clips with unprocessed views (view_count <= 1) when sorting by views
+      const hasRealViews = result.some(c => c.view_count > 1);
+      if (hasRealViews) {
+        result = result.filter(c => c.view_count > 1);
+      }
       result.sort((a, b) => b.view_count - a.view_count);
     }
     
