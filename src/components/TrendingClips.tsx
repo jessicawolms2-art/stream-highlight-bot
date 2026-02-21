@@ -123,7 +123,7 @@ const TrendingClips = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['es']);
   const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
-  const [timeFilter, setTimeFilter] = useState('24h');
+  const [timeFilter, setTimeFilter] = useState('7d');
   const [selectedStreamers, setSelectedStreamers] = useState<{ name: string; avatar?: string }[]>([]);
   const [streamerInput, setStreamerInput] = useState('');
   const [channelSuggestions, setChannelSuggestions] = useState<TwitchChannel[]>([]);
