@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer, User, X, EyeOff, Check, Radio, Download } from "lucide-react";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Globe, Gamepad2, Timer, User, X, EyeOff, Check, Radio, Download, ArrowDownUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import MultiSelectFilter, { FilterOption } from "@/components/MultiSelectFilter";
@@ -124,6 +124,7 @@ const TrendingClips = () => {
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['es']);
   const [selectedGameIds, setSelectedGameIds] = useState<string[]>([]);
   const [timeFilter, setTimeFilter] = useState('7d');
+  const [sortBy, setSortBy] = useState<'views' | 'recent'>('views');
   const [selectedStreamers, setSelectedStreamers] = useState<{ name: string; avatar?: string }[]>([]);
   const [streamerInput, setStreamerInput] = useState('');
   const [channelSuggestions, setChannelSuggestions] = useState<TwitchChannel[]>([]);
@@ -297,12 +298,23 @@ const TrendingClips = () => {
   };
 
   const getDisplayClips = (): TrendingClip[] => {
+    let result: TrendingClip[];
     if (showOnlyViewed) {
       const storedData = getViewedClipsData();
-      return Array.from(storedData.values()).map(clip => ({ ...clip, language: undefined }));
+      result = Array.from(storedData.values()).map(clip => ({ ...clip, language: undefined }));
+    } else if (hideViewed) {
+      result = clips.filter(clip => !viewedClips.has(clip.id));
+    } else {
+      result = [...clips];
     }
-    if (hideViewed) return clips.filter(clip => !viewedClips.has(clip.id));
-    return clips;
+    
+    if (sortBy === 'recent') {
+      result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    } else {
+      result.sort((a, b) => b.view_count - a.view_count);
+    }
+    
+    return result;
   };
 
   const filteredClips = getDisplayClips();
@@ -390,6 +402,20 @@ const TrendingClips = () => {
             placeholder="Todos los idiomas"
             icon={<Globe className="h-4 w-4" />}
           />
+
+          {/* Sort filter */}
+          <div className="flex items-center gap-2">
+            <ArrowDownUp className="h-4 w-4 text-muted-foreground" />
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'views' | 'recent')}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Ordenar" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="views">Más vistas</SelectItem>
+                <SelectItem value="recent">Más recientes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Time filter (single select) */}
           <div className="flex items-center gap-2">
