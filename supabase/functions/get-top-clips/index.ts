@@ -145,26 +145,8 @@ serve(async (req) => {
       if (gameIdList.length > 0) {
         filtered = filtered.filter(c => gameIdList.includes(c.game_id));
       }
-      // Apply language filter if specified for broadcaster clips
-      if (!needsAllLangs) {
-        // Fetch broadcaster languages
-        const bIds = [...new Set(filtered.map(c => c.broadcaster_id))];
-        const bLangs: Record<string, string> = {};
-        for (let i = 0; i < bIds.length; i += 100) {
-          const batch = bIds.slice(i, i + 100);
-          const idsParam = batch.map(id => `broadcaster_id=${id}`).join('&');
-          try {
-            const resp = await fetch(`https://api.twitch.tv/helix/channels?${idsParam}`, { headers: twitchHeaders });
-            const data = await resp.json();
-            for (const ch of data.data || []) bLangs[ch.broadcaster_id] = ch.broadcaster_language;
-          } catch {}
-        }
-        filtered = filtered.filter(c => {
-          const lang = bLangs[c.broadcaster_id];
-          if (!lang) return false;
-          return langList.some(l => lang === l || lang.startsWith(l + '-'));
-        });
-      }
+      // Don't apply language filter when searching by specific broadcasters
+      // The user explicitly chose these streamers, so show their clips regardless of language
 
       filtered.sort((a, b) => b.view_count - a.view_count);
 
