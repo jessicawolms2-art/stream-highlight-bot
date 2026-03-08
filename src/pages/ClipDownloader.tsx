@@ -88,6 +88,14 @@ const ClipDownloader = () => {
         <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-[hsl(264,100%,64%)] opacity-[0.06] blur-[120px]" />
       </div>
 
+      {/* Back button */}
+      <div className="relative z-10 w-full max-w-xl mb-6">
+        <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-[hsl(0,0%,60%)] hover:text-[hsl(264,100%,80%)] transition-colors">
+          <ArrowLeft className="h-4 w-4" />
+          Volver a ClipMatic
+        </Link>
+      </div>
+
       {/* Header */}
       <div className="relative z-10 text-center mb-10 md:mb-14">
         <div className="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full border border-[hsl(264,60%,30%)] bg-[hsl(264,60%,12%)]/60 text-xs font-medium text-[hsl(264,100%,80%)] backdrop-blur-sm">
