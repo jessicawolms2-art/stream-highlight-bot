@@ -8,7 +8,8 @@ import VideoPlayer from "@/components/VideoPlayer";
 import TrendingClips from "@/components/TrendingClips";
 import KickTrendingClips from "@/components/KickTrendingClips";
 import StreamerSearch from "@/components/StreamerSearch";
-import { Scissors } from "lucide-react";
+import { Scissors, Download } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -124,9 +125,16 @@ const Index = () => {
               ClipMatic
             </h1>
           </div>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
             Genera clips automáticos de tus streams de Twitch o Kick basándote en la actividad del chat
           </p>
+          <Link
+            to="/descargar"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
+          >
+            <Download className="h-4 w-4" />
+            Descargar Clips de Twitch
+          </Link>
         </div>
 
         {/* URL Input */}
