@@ -8,7 +8,8 @@ import VideoPlayer from "@/components/VideoPlayer";
 import TrendingClips from "@/components/TrendingClips";
 import KickTrendingClips from "@/components/KickTrendingClips";
 import StreamerSearch from "@/components/StreamerSearch";
-import { Scissors } from "lucide-react";
+import { Scissors, Download } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
