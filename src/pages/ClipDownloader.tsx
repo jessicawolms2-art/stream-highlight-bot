@@ -67,9 +67,16 @@ const ClipDownloader = () => {
   const handleDownload = () => {
     if (!clip) return;
     const q = clip.qualities[selectedQuality];
-    // In production, this would trigger a real download
+    // Download by opening the video URL directly
+    const a = document.createElement('a');
+    a.href = q.url;
+    a.download = `${clip.title || 'clip'}.mp4`;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     toast({ title: "Descarga iniciada", description: `Descargando en ${q.label}...` });
-    // window.open(q.url, "_blank");
   };
 
   return (
