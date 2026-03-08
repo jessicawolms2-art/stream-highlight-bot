@@ -1,10 +1,11 @@
 import { useState, useCallback } from "react";
-import { Download, Link2, Loader2, Play, User, Calendar, Gamepad2, ChevronDown, Sparkles, ArrowLeft } from "lucide-react";
+import { Download, Link2, Loader2, Play, User, Calendar, Gamepad2, ChevronDown, Sparkles, ArrowLeft, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ClipData {
   title: string;
@@ -14,31 +15,21 @@ interface ClipData {
   thumbnailUrl: string;
   duration: number;
   viewCount: number;
+  videoUrl: string;
+  clipUrl: string;
+  embedUrl: string;
   qualities: { label: string; url: string }[];
 }
 
-// Mock function — replace with real API call (RapidAPI, yt-dlp backend, etc.)
 const fetchClipData = async (url: string): Promise<ClipData> => {
-  await new Promise((r) => setTimeout(r, 2000));
+  const { data, error } = await supabase.functions.invoke('get-clip-info', {
+    body: { clipUrl: url }
+  });
 
-  // Extract slug from URL for a realistic feel
-  const slug = url.split("/").pop() || "clip";
+  if (error) throw error;
+  if (data.error) throw new Error(data.error);
 
-  return {
-    title: `Insane ${slug.replace(/-/g, " ")} Play`,
-    streamer: "StreamerPro",
-    game: "Valorant",
-    createdAt: new Date().toISOString(),
-    duration: 30,
-    viewCount: 12400,
-    thumbnailUrl: `https://static-cdn.jtvnw.net/previews-ttv/live_user_streamerpro-640x360.jpg`,
-    qualities: [
-      { label: "Original (1080p60)", url: `https://example.com/clip/${slug}/1080p60.mp4` },
-      { label: "720p", url: `https://example.com/clip/${slug}/720p.mp4` },
-      { label: "480p", url: `https://example.com/clip/${slug}/480p.mp4` },
-      { label: "360p", url: `https://example.com/clip/${slug}/360p.mp4` },
-    ],
-  };
+  return data;
 };
 
 const ClipDownloader = () => {
@@ -76,9 +67,16 @@ const ClipDownloader = () => {
   const handleDownload = () => {
     if (!clip) return;
     const q = clip.qualities[selectedQuality];
-    // In production, this would trigger a real download
+    // Download by opening the video URL directly
+    const a = document.createElement('a');
+    a.href = q.url;
+    a.download = `${clip.title || 'clip'}.mp4`;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     toast({ title: "Descarga iniciada", description: `Descargando en ${q.label}...` });
-    // window.open(q.url, "_blank");
   };
 
   return (
@@ -168,21 +166,16 @@ const ClipDownloader = () => {
       {clip && !isLoading && (
         <div className="relative z-10 w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="rounded-2xl border border-[hsl(264,40%,20%)] bg-[hsl(0,0%,7%)]/80 backdrop-blur-xl overflow-hidden shadow-[0_0_60px_hsl(264,100%,64%,0.08)]">
-            {/* Thumbnail */}
-            <div className="relative group">
-              <img
-                src={clip.thumbnailUrl}
-                alt={clip.title}
-                className="w-full aspect-video object-cover bg-[hsl(0,0%,10%)]"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/placeholder.svg";
-                }}
+            {/* Embedded clip player */}
+            <div className="relative">
+              <iframe
+                src={`${clip.embedUrl}&parent=${window.location.hostname}&autoplay=false`}
+                className="w-full aspect-video"
+                allowFullScreen
+                allow="autoplay; encrypted-media"
               />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Play className="h-12 w-12 text-white/90" fill="currentColor" />
-              </div>
               <span className="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-2 py-0.5 rounded-md font-mono backdrop-blur-sm">
-                {clip.duration}s
+                {Math.round(clip.duration)}s
               </span>
             </div>
 
@@ -203,8 +196,11 @@ const ClipDownloader = () => {
                   <Calendar className="h-3.5 w-3.5 text-[hsl(264,100%,64%)]" />
                   {new Date(clip.createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}
                 </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5 text-[hsl(264,100%,64%)]" />
+                  {clip.viewCount.toLocaleString()} vistas
+                </span>
               </div>
-
               {/* Quality selector */}
               <div className="relative">
                 <button
