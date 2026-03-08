@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { Download, Link2, Loader2, Play, User, Calendar, Gamepad2, ChevronDown, Sparkles } from "lucide-react";
+import { Download, Link2, Loader2, Play, User, Calendar, Gamepad2, ChevronDown, Sparkles, ArrowLeft } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
