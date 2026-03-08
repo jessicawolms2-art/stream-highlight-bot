@@ -166,21 +166,16 @@ const ClipDownloader = () => {
       {clip && !isLoading && (
         <div className="relative z-10 w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="rounded-2xl border border-[hsl(264,40%,20%)] bg-[hsl(0,0%,7%)]/80 backdrop-blur-xl overflow-hidden shadow-[0_0_60px_hsl(264,100%,64%,0.08)]">
-            {/* Thumbnail */}
-            <div className="relative group">
-              <img
-                src={clip.thumbnailUrl}
-                alt={clip.title}
-                className="w-full aspect-video object-cover bg-[hsl(0,0%,10%)]"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/placeholder.svg";
-                }}
+            {/* Embedded clip player */}
+            <div className="relative">
+              <iframe
+                src={`${clip.embedUrl}&parent=${window.location.hostname}&autoplay=false`}
+                className="w-full aspect-video"
+                allowFullScreen
+                allow="autoplay; encrypted-media"
               />
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Play className="h-12 w-12 text-white/90" fill="currentColor" />
-              </div>
               <span className="absolute bottom-3 right-3 bg-black/70 text-white text-xs px-2 py-0.5 rounded-md font-mono backdrop-blur-sm">
-                {clip.duration}s
+                {Math.round(clip.duration)}s
               </span>
             </div>
 
@@ -201,8 +196,11 @@ const ClipDownloader = () => {
                   <Calendar className="h-3.5 w-3.5 text-[hsl(264,100%,64%)]" />
                   {new Date(clip.createdAt).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}
                 </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Eye className="h-3.5 w-3.5 text-[hsl(264,100%,64%)]" />
+                  {clip.viewCount.toLocaleString()} vistas
+                </span>
               </div>
-
               {/* Quality selector */}
               <div className="relative">
                 <button
