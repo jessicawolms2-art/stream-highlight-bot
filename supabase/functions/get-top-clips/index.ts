@@ -125,6 +125,7 @@ serve(async (req) => {
           url.searchParams.set('broadcaster_id', bId);
           url.searchParams.set('first', '100');
           url.searchParams.set('started_at', startedAt.toISOString());
+          url.searchParams.set('ended_at', endedAtISO);
           if (clipCursor) url.searchParams.set('after', clipCursor);
 
           const resp = await fetch(url.toString(), { headers: twitchHeaders });
