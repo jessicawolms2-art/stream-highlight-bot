@@ -206,6 +206,7 @@ serve(async (req) => {
             url.searchParams.set('game_id', game.id);
             url.searchParams.set('first', '100');
             url.searchParams.set('started_at', startedAt.toISOString());
+            url.searchParams.set('ended_at', endedAtISO);
             if (gameCursor) url.searchParams.set('after', gameCursor);
 
             const resp = await fetch(url.toString(), { headers: twitchHeaders });
