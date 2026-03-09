@@ -81,8 +81,10 @@ serve(async (req) => {
       '1h': 1, '2h': 2, '3h': 3, '6h': 6, '12h': 12, '24h': 24, '3d': 72, '7d': 168, '30d': 720,
     };
     const hoursBack = timeFilterHours[timeFilter] || 24;
+    const endedAt = new Date();
     const startedAt = new Date();
     startedAt.setHours(startedAt.getHours() - hoursBack);
+    const endedAtISO = endedAt.toISOString();
 
     // Get top games
     const gamesResponse = await fetch('https://api.twitch.tv/helix/games/top?first=100', { headers: twitchHeaders });
