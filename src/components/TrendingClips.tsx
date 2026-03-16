@@ -57,6 +57,7 @@ const TIME_FILTERS = [
   { value: '6h', label: '6 horas', hours: 6 },
   { value: '12h', label: '12 horas', hours: 12 },
   { value: '24h', label: '24 horas', hours: 24 },
+  { value: '2d', label: '2 días', hours: 48 },
   { value: '3d', label: '3 días', hours: 72 },
   { value: '7d', label: '1 semana', hours: 168 },
   { value: '30d', label: '1 mes', hours: 720 },
