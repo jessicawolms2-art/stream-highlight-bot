@@ -78,7 +78,7 @@ serve(async (req) => {
 
     // Calculate time range
     const timeFilterHours: Record<string, number> = {
-      '1h': 1, '2h': 2, '3h': 3, '6h': 6, '12h': 12, '24h': 24, '3d': 72, '7d': 168, '30d': 720,
+      '1h': 1, '2h': 2, '3h': 3, '6h': 6, '12h': 12, '24h': 24, '2d': 48, '3d': 72, '7d': 168, '30d': 720,
     };
     const hoursBack = timeFilterHours[timeFilter] || 24;
     const endedAt = new Date();
