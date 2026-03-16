@@ -139,7 +139,7 @@ const TrendingClips = () => {
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const handleDownloadClip = (clip: TrendingClip, e: React.MouseEvent) => {

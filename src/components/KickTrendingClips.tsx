@@ -138,7 +138,7 @@ const KickTrendingClips = () => {
   const [channelSuggestions, setChannelSuggestions] = useState<KickChannel[]>([]);
   const [isSearchingChannels, setIsSearchingChannels] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);

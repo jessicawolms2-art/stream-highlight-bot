@@ -45,7 +45,7 @@ const MultiSelectFilter = ({
 }: MultiSelectFilterProps) => {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleToggle = (value: string) => {
     if (value === allValue) {
