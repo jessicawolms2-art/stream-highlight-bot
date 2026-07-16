@@ -395,22 +395,31 @@ const KickTrendingClips = () => {
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
             <div className="relative">
-              <Popover open={showSuggestions && channelSuggestions.length > 0} onOpenChange={setShowSuggestions}>
-                <PopoverTrigger asChild>
-                  <Input
-                    placeholder="Añadir streamer..."
-                    value={streamerInput}
-                    onChange={(e) => handleStreamerInputChange(e.target.value)}
-                    onKeyDown={handleStreamerKeyPress}
-                    onFocus={() => streamerInput.length >= 2 && setShowSuggestions(true)}
-                    className="w-[180px] h-9"
-                  />
-                </PopoverTrigger>
-                <PopoverContent className="w-[280px] p-1" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+              <Input
+                placeholder="Añadir streamer..."
+                value={streamerInput}
+                onChange={(e) => handleStreamerInputChange(e.target.value)}
+                onKeyDown={handleStreamerKeyPress}
+                onFocus={() => {
+                  if (streamerInput.length >= 2 && channelSuggestions.length > 0) {
+                    setShowSuggestions(true);
+                  }
+                }}
+                onBlur={() => {
+                  setTimeout(() => setShowSuggestions(false), 200);
+                }}
+                className="w-[180px] h-9"
+              />
+              {isSearchingChannels && (
+                <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+              {showSuggestions && channelSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 z-50 mt-1 w-[280px] rounded-md border bg-popover p-1 shadow-md">
                   <div className="max-h-[300px] overflow-y-auto">
                     {channelSuggestions.map((channel) => (
                       <button
                         key={channel.id}
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => selectChannel(channel)}
                         className="w-full flex items-center gap-3 p-2 hover:bg-accent rounded-md transition-colors text-left"
                       >
@@ -429,10 +438,7 @@ const KickTrendingClips = () => {
                       </button>
                     ))}
                   </div>
-                </PopoverContent>
-              </Popover>
-              {isSearchingChannels && (
-                <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
               )}
             </div>
           </div>
