@@ -136,6 +136,8 @@ const TrendingClips = () => {
   const [totalFound, setTotalFound] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [viewedClips, setViewedClips] = useState<Set<string>>(getViewedClips);
+  const [viewedClipsData, setViewedClipsData] = useState<Map<string, StoredClip>>(getViewedClipsData);
+  const [isLoadingViewed, setIsLoadingViewed] = useState(false);
   const [hideViewed, setHideViewed] = useState(false);
   const [showOnlyViewed, setShowOnlyViewed] = useState(false);
   
@@ -147,17 +149,54 @@ const TrendingClips = () => {
   // Backfill stored metadata for clips marked as viewed before metadata was saved
   useEffect(() => {
     if (clips.length === 0 || viewedClips.size === 0) return;
-    const stored = getViewedClipsData();
+    const stored = new Map(viewedClipsData);
+    let changed = false;
     clips.forEach(clip => {
       if (viewedClips.has(clip.id) && !stored.has(clip.id)) {
-        saveViewedClipData({
+        const storedClip = {
           id: clip.id, title: clip.title, broadcaster_name: clip.broadcaster_name,
           game_name: clip.game_name, thumbnail_url: clip.thumbnail_url, view_count: clip.view_count,
           duration: clip.duration, created_at: clip.created_at, url: clip.url, embed_url: clip.embed_url,
-        });
+        };
+        stored.set(clip.id, storedClip);
+        saveViewedClipData(storedClip);
+        changed = true;
       }
     });
-  }, [clips, viewedClips]);
+    if (changed) setViewedClipsData(stored);
+  }, [clips, viewedClips, viewedClipsData]);
+
+  // Older viewed history only stored IDs. Recover all available metadata from
+  // Twitch so the Viewed tab is not limited to clips in the current page.
+  useEffect(() => {
+    if (!showOnlyViewed || viewedClips.size === 0) return;
+    const missingIds = [...viewedClips].filter(id => !viewedClipsData.has(id));
+    if (missingIds.length === 0) return;
+
+    let cancelled = false;
+    const recoverViewedClips = async () => {
+      setIsLoadingViewed(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('get-top-clips', {
+          body: { action: 'get_clips_by_ids', clipIds: missingIds },
+        });
+        if (error) throw error;
+        if (cancelled) return;
+        const recovered = new Map(viewedClipsData);
+        for (const clip of data?.clips || []) {
+          recovered.set(clip.id, clip);
+          saveViewedClipData(clip);
+        }
+        setViewedClipsData(recovered);
+      } catch (err) {
+        console.error('Error recovering viewed clips:', err);
+      } finally {
+        if (!cancelled) setIsLoadingViewed(false);
+      }
+    };
+    recoverViewedClips();
+    return () => { cancelled = true; };
+  }, [showOnlyViewed, viewedClips, viewedClipsData]);
 
 
 
@@ -298,13 +337,20 @@ const TrendingClips = () => {
       if (newSet.has(clip.id)) {
         newSet.delete(clip.id);
         removeViewedClipData(clip.id);
+        setViewedClipsData(current => {
+          const next = new Map(current);
+          next.delete(clip.id);
+          return next;
+        });
       } else {
         newSet.add(clip.id);
-        saveViewedClipData({
+        const storedClip = {
           id: clip.id, title: clip.title, broadcaster_name: clip.broadcaster_name,
           game_name: clip.game_name, thumbnail_url: clip.thumbnail_url, view_count: clip.view_count,
           duration: clip.duration, created_at: clip.created_at, url: clip.url, embed_url: clip.embed_url,
-        });
+        };
+        saveViewedClipData(storedClip);
+        setViewedClipsData(current => new Map(current).set(clip.id, storedClip));
       }
       saveViewedClips(newSet);
       return newSet;
@@ -315,15 +361,15 @@ const TrendingClips = () => {
     setViewedClips(new Set());
     localStorage.removeItem(VIEWED_CLIPS_KEY);
     localStorage.removeItem(VIEWED_CLIPS_DATA_KEY);
+    setViewedClipsData(new Map());
   };
 
   const getDisplayClips = (): TrendingClip[] => {
     let result: TrendingClip[];
     if (showOnlyViewed) {
-      const storedData = getViewedClipsData();
       const byId = new Map<string, TrendingClip>();
       // Stored metadata (clips marked as viewed in any previous session)
-      storedData.forEach((clip, id) => {
+      viewedClipsData.forEach((clip, id) => {
         if (viewedClips.has(id)) byId.set(id, { ...clip, language: undefined });
       });
       // Fallback: viewed ids without stored metadata but present in current results
@@ -331,6 +377,10 @@ const TrendingClips = () => {
         if (viewedClips.has(clip.id) && !byId.has(clip.id)) byId.set(clip.id, clip);
       });
       result = Array.from(byId.values());
+      if (selectedStreamers.length > 0) {
+        const selectedNames = new Set(selectedStreamers.map(streamer => streamer.name.trim().toLowerCase()));
+        result = result.filter(clip => selectedNames.has(clip.broadcaster_name.trim().toLowerCase()));
+      }
       // In "viewed" mode never filter by view_count, just sort
       if (sortBy === 'recent') {
         result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -593,10 +643,10 @@ const TrendingClips = () => {
         )}
       </div>
 
-      {isLoading && clips.length === 0 ? (
+      {(isLoading && clips.length === 0) || (showOnlyViewed && isLoadingViewed && filteredClips.length === 0) ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-3 text-muted-foreground">Cargando clips trending...</span>
+          <span className="ml-3 text-muted-foreground">{showOnlyViewed ? 'Recuperando clips vistos...' : 'Cargando clips trending...'}</span>
         </div>
       ) : error ? (
         <div className="text-center py-12">
@@ -606,8 +656,8 @@ const TrendingClips = () => {
       ) : filteredClips.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Flame className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p>{hideViewed && clips.length > 0 ? 'Todos los clips han sido marcados como vistos' : 'No se encontraron clips con los filtros seleccionados'}</p>
-          <p className="text-sm mt-2">{hideViewed && clips.length > 0 ? 'Desactiva "Ocultar vistos" o limpia el historial' : 'Prueba con otros filtros'}</p>
+           <p>{showOnlyViewed ? 'No hay clips vistos disponibles para el streamer seleccionado' : hideViewed && clips.length > 0 ? 'Todos los clips han sido marcados como vistos' : 'No se encontraron clips con los filtros seleccionados'}</p>
+           <p className="text-sm mt-2">{showOnlyViewed ? 'Los clips eliminados o expirados en Twitch no se pueden recuperar' : hideViewed && clips.length > 0 ? 'Cambia a “Todos” o limpia el historial' : 'Prueba con otros filtros'}</p>
         </div>
       ) : (
         <>

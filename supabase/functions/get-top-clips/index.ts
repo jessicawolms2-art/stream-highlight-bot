@@ -19,7 +19,8 @@ serve(async (req) => {
       limit = 40, cursor,
       gameId, gameIds,
       timeFilter = '24h',
-      broadcasterName, broadcasterNames
+      broadcasterName, broadcasterNames,
+      clipIds
     } = body;
 
     // Normalize arrays
@@ -56,6 +57,52 @@ serve(async (req) => {
       'Client-ID': TWITCH_CLIENT_ID,
       'Authorization': `Bearer ${accessToken}`,
     };
+
+    // Recover metadata for clips marked as viewed before full clip data was
+    // persisted in the browser. Twitch accepts up to 100 clip IDs per call.
+    if (action === 'get_clips_by_ids') {
+      const requestedIds = Array.isArray(clipIds)
+        ? [...new Set(clipIds.filter((id: unknown): id is string => typeof id === 'string' && id.length > 0))].slice(0, 500)
+        : [];
+
+      if (requestedIds.length === 0) {
+        return new Response(JSON.stringify({ success: true, clips: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const clipBatches: string[][] = [];
+      for (let i = 0; i < requestedIds.length; i += 100) clipBatches.push(requestedIds.slice(i, i + 100));
+
+      const clipResults = await Promise.all(clipBatches.map(async (batch) => {
+        const params = batch.map(id => `id=${encodeURIComponent(id)}`).join('&');
+        const response = await fetch(`https://api.twitch.tv/helix/clips?${params}`, { headers: twitchHeaders });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.data || [];
+      }));
+      const recoveredClips = clipResults.flat();
+
+      const recoveredGameIds = [...new Set(recoveredClips.map((clip: any) => clip.game_id).filter(Boolean))] as string[];
+      const gameNames: Record<string, string> = {};
+      for (let i = 0; i < recoveredGameIds.length; i += 100) {
+        const params = recoveredGameIds.slice(i, i + 100).map(id => `id=${encodeURIComponent(id)}`).join('&');
+        const response = await fetch(`https://api.twitch.tv/helix/games?${params}`, { headers: twitchHeaders });
+        if (!response.ok) continue;
+        const data = await response.json();
+        for (const game of data.data || []) gameNames[game.id] = game.name;
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        clips: recoveredClips.map((clip: any) => ({
+          id: clip.id, title: clip.title, broadcaster_name: clip.broadcaster_name,
+          game_name: gameNames[clip.game_id] || 'Unknown', thumbnail_url: clip.thumbnail_url,
+          view_count: clip.view_count, duration: clip.duration, created_at: clip.created_at,
+          url: clip.url, embed_url: clip.embed_url,
+        })),
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     // Handle channel search
     if (action === 'search_channels' && query) {
