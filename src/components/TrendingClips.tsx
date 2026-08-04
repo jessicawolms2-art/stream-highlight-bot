@@ -60,6 +60,8 @@ const TIME_FILTERS = [
   { value: '2d', label: '2 días', hours: 48 },
   { value: '3d', label: '3 días', hours: 72 },
   { value: '7d', label: '1 semana', hours: 168 },
+  { value: '2w', label: '2 semanas', hours: 336 },
+  { value: '3w', label: '3 semanas', hours: 504 },
   { value: '30d', label: '1 mes', hours: 720 },
 ];
 
