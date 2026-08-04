@@ -78,7 +78,8 @@ serve(async (req) => {
 
     // Calculate time range
     const timeFilterHours: Record<string, number> = {
-      '1h': 1, '2h': 2, '3h': 3, '6h': 6, '12h': 12, '24h': 24, '2d': 48, '3d': 72, '7d': 168, '30d': 720,
+      '1h': 1, '2h': 2, '3h': 3, '6h': 6, '12h': 12, '24h': 24, '2d': 48, '3d': 72,
+      '7d': 168, '2w': 336, '3w': 504, '30d': 720,
     };
     const hoursBack = timeFilterHours[timeFilter] || 24;
     const endedAt = new Date();
@@ -116,30 +117,43 @@ serve(async (req) => {
 
       const broadcasterIds = (await Promise.all(broadcasterPromises)).filter(Boolean) as string[];
 
-      const clipPromises = broadcasterIds.map(async (bId: string) => {
-        const clips: any[] = [];
-        let clipCursor: string | undefined;
-        for (let page = 0; page < 15; page++) {
-          if (Date.now() - startTime > TIME_BUDGET_MS) break;
-          const url = new URL('https://api.twitch.tv/helix/clips');
-          url.searchParams.set('broadcaster_id', bId);
-          url.searchParams.set('first', '100');
-          url.searchParams.set('started_at', startedAt.toISOString());
-          url.searchParams.set('ended_at', endedAtISO);
-          if (clipCursor) url.searchParams.set('after', clipCursor);
+      // Twitch limits broadcaster clip queries to ~1 week windows, so split
+      // long ranges (2 weeks, 3 weeks, 1 month...) into 7-day chunks.
+      const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+      const windows: Array<{ from: Date; to: Date }> = [];
+      let winEnd = new Date(endedAt);
+      while (winEnd.getTime() > startedAt.getTime()) {
+        const winStart = new Date(Math.max(startedAt.getTime(), winEnd.getTime() - WEEK_MS));
+        windows.push({ from: winStart, to: winEnd });
+        winEnd = new Date(winStart.getTime() - 1000);
+      }
 
-          const resp = await fetch(url.toString(), { headers: twitchHeaders });
-          const data = await resp.json();
-          if (!data.data || data.data.length === 0) break;
+      const clipPromises = broadcasterIds.flatMap((bId: string) =>
+        windows.map(async (win) => {
+          const clips: any[] = [];
+          let clipCursor: string | undefined;
+          for (let page = 0; page < 10; page++) {
+            if (Date.now() - startTime > TIME_BUDGET_MS) break;
+            const url = new URL('https://api.twitch.tv/helix/clips');
+            url.searchParams.set('broadcaster_id', bId);
+            url.searchParams.set('first', '100');
+            url.searchParams.set('started_at', win.from.toISOString());
+            url.searchParams.set('ended_at', win.to.toISOString());
+            if (clipCursor) url.searchParams.set('after', clipCursor);
 
-          for (const clip of data.data) {
-            clips.push({ ...clip, game_name: topGames.find((g: any) => g.id === clip.game_id)?.name || 'Unknown' });
+            const resp = await fetch(url.toString(), { headers: twitchHeaders });
+            const data = await resp.json();
+            if (!data.data || data.data.length === 0) break;
+
+            for (const clip of data.data) {
+              clips.push({ ...clip, game_name: topGames.find((g: any) => g.id === clip.game_id)?.name || 'Unknown' });
+            }
+            clipCursor = data.pagination?.cursor;
+            if (!clipCursor) break;
           }
-          clipCursor = data.pagination?.cursor;
-          if (!clipCursor) break;
-        }
-        return clips;
-      });
+          return clips;
+        })
+      );
 
       const results = await Promise.all(clipPromises);
       for (const clips of results) allClips.push(...clips);
