@@ -183,11 +183,19 @@ const KickTrendingClips = () => {
   const getDisplayClips = (): KickClip[] => {
     if (showOnlyViewed) {
       const storedData = getViewedClipsData();
-      return Array.from(storedData.values()).map(clip => ({ ...clip, embed_url: clip.url, platform: 'kick' }));
+      const byId = new Map<string, KickClip>();
+      storedData.forEach((clip, id) => {
+        if (viewedClips.has(id)) byId.set(id, { ...clip, embed_url: clip.url, platform: 'kick' } as KickClip);
+      });
+      clips.forEach(clip => {
+        if (viewedClips.has(clip.id) && !byId.has(clip.id)) byId.set(clip.id, clip);
+      });
+      return Array.from(byId.values());
     }
     if (hideViewed) return clips.filter(clip => !viewedClips.has(clip.id));
     return clips;
   };
+
 
   const filteredClips = getDisplayClips();
 

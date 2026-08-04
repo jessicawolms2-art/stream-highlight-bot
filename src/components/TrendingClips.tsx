@@ -144,6 +144,23 @@ const TrendingClips = () => {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Backfill stored metadata for clips marked as viewed before metadata was saved
+  useEffect(() => {
+    if (clips.length === 0 || viewedClips.size === 0) return;
+    const stored = getViewedClipsData();
+    clips.forEach(clip => {
+      if (viewedClips.has(clip.id) && !stored.has(clip.id)) {
+        saveViewedClipData({
+          id: clip.id, title: clip.title, broadcaster_name: clip.broadcaster_name,
+          game_name: clip.game_name, thumbnail_url: clip.thumbnail_url, view_count: clip.view_count,
+          duration: clip.duration, created_at: clip.created_at, url: clip.url, embed_url: clip.embed_url,
+        });
+      }
+    });
+  }, [clips, viewedClips]);
+
+
+
   const handleDownloadClip = (clip: TrendingClip, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -304,13 +321,29 @@ const TrendingClips = () => {
     let result: TrendingClip[];
     if (showOnlyViewed) {
       const storedData = getViewedClipsData();
-      result = Array.from(storedData.values()).map(clip => ({ ...clip, language: undefined }));
+      const byId = new Map<string, TrendingClip>();
+      // Stored metadata (clips marked as viewed in any previous session)
+      storedData.forEach((clip, id) => {
+        if (viewedClips.has(id)) byId.set(id, { ...clip, language: undefined });
+      });
+      // Fallback: viewed ids without stored metadata but present in current results
+      clips.forEach(clip => {
+        if (viewedClips.has(clip.id) && !byId.has(clip.id)) byId.set(clip.id, clip);
+      });
+      result = Array.from(byId.values());
+      // In "viewed" mode never filter by view_count, just sort
+      if (sortBy === 'recent') {
+        result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      } else {
+        result.sort((a, b) => b.view_count - a.view_count);
+      }
+      return result;
     } else if (hideViewed) {
       result = clips.filter(clip => !viewedClips.has(clip.id));
     } else {
       result = [...clips];
     }
-    
+
     if (sortBy === 'recent') {
       result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     } else {
@@ -321,9 +354,10 @@ const TrendingClips = () => {
       }
       result.sort((a, b) => b.view_count - a.view_count);
     }
-    
+
     return result;
   };
+
 
   const filteredClips = getDisplayClips();
 
