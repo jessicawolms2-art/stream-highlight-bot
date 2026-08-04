@@ -144,6 +144,23 @@ const TrendingClips = () => {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Backfill stored metadata for clips marked as viewed before metadata was saved
+  useEffect(() => {
+    if (clips.length === 0 || viewedClips.size === 0) return;
+    const stored = getViewedClipsData();
+    clips.forEach(clip => {
+      if (viewedClips.has(clip.id) && !stored.has(clip.id)) {
+        saveViewedClipData({
+          id: clip.id, title: clip.title, broadcaster_name: clip.broadcaster_name,
+          game_name: clip.game_name, thumbnail_url: clip.thumbnail_url, view_count: clip.view_count,
+          duration: clip.duration, created_at: clip.created_at, url: clip.url, embed_url: clip.embed_url,
+        });
+      }
+    });
+  }, [clips, viewedClips]);
+
+
+
   const handleDownloadClip = (clip: TrendingClip, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
