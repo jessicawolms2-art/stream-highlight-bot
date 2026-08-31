@@ -143,6 +143,8 @@ const TrendingClips = () => {
   const [isLoadingViewed, setIsLoadingViewed] = useState(false);
   const [hideViewed, setHideViewed] = useState(false);
   const [showOnlyViewed, setShowOnlyViewed] = useState(false);
+  const { favorites, isFavorite, toggleFavorite, removeFavorite, clearFavorites } = useFavoriteStreamers('twitch');
+
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
