@@ -524,8 +524,6 @@ const KickTrendingClips = () => {
               </Badge>
             ))}
 
-              </Badge>
-            ))}
             <Button variant="ghost" size="sm" onClick={() => setSelectedStreamers([])}
               className="h-6 text-xs text-muted-foreground hover:text-destructive px-1"
             >Limpiar</Button>
