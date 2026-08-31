@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Gamepad2, Calendar, CheckCircle, X, Download, User, Globe } from "lucide-react";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Gamepad2, Calendar, CheckCircle, X, Download, User, Globe, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import MultiSelectFilter, { FilterOption } from "@/components/MultiSelectFilter";
+import FavoriteStreamersMenu from "@/components/FavoriteStreamersMenu";
+import { useFavoriteStreamers } from "@/hooks/use-favorite-streamers";
+
 
 const VIEWED_CLIPS_KEY = 'kick_viewed_clips';
 const VIEWED_CLIPS_DATA_KEY = 'kick_viewed_clips_data';
@@ -139,6 +142,8 @@ const KickTrendingClips = () => {
   const [isSearchingChannels, setIsSearchingChannels] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { favorites, isFavorite, toggleFavorite, removeFavorite, clearFavorites } = useFavoriteStreamers('kick');
+
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -402,7 +407,19 @@ const KickTrendingClips = () => {
           {/* Streamer filter */}
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
+            <FavoriteStreamersMenu
+              favorites={favorites}
+              onSelect={(fav) => {
+                if (!selectedStreamers.find(s => s.name.toLowerCase() === fav.name.toLowerCase())) {
+                  setSelectedStreamers(prev => [...prev, fav]);
+                }
+              }}
+              onRemove={removeFavorite}
+              onClear={clearFavorites}
+              accentClassName="text-[#53fc18]"
+            />
             <div className="relative">
+
               <Input
                 placeholder="Añadir streamer..."
                 value={streamerInput}
@@ -425,26 +442,36 @@ const KickTrendingClips = () => {
                 <div className="absolute top-full left-0 z-50 mt-1 w-[280px] rounded-md border bg-popover p-1 shadow-md">
                   <div className="max-h-[300px] overflow-y-auto">
                     {channelSuggestions.map((channel) => (
-                      <button
-                        key={channel.id}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => selectChannel(channel)}
-                        className="w-full flex items-center gap-3 p-2 hover:bg-accent rounded-md transition-colors text-left"
-                      >
-                        {channel.profile_pic && <img src={channel.profile_pic} alt="" className="w-8 h-8 rounded-full" />}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm truncate">{channel.username}</span>
-                            {channel.is_live && (
-                              <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">LIVE</Badge>
+                      <div key={channel.id} className="flex items-center gap-1 rounded-md hover:bg-accent">
+                        <button
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectChannel(channel)}
+                          className="flex flex-1 items-center gap-3 p-2 transition-colors text-left min-w-0"
+                        >
+                          {channel.profile_pic && <img src={channel.profile_pic} alt="" className="w-8 h-8 rounded-full" />}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm truncate">{channel.username}</span>
+                              {channel.is_live && (
+                                <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">LIVE</Badge>
+                              )}
+                            </div>
+                            {channel.category && (
+                              <span className="text-xs text-muted-foreground truncate block">{channel.category}</span>
                             )}
                           </div>
-                          {channel.category && (
-                            <span className="text-xs text-muted-foreground truncate block">{channel.category}</span>
-                          )}
-                        </div>
-                      </button>
+                        </button>
+                        <button
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => toggleFavorite({ name: channel.slug || channel.username, avatar: channel.profile_pic })}
+                          className="p-2 text-muted-foreground hover:text-[#53fc18]"
+                          title={isFavorite(channel.slug || channel.username) ? "Quitar de favoritos" : "Guardar en favoritos"}
+                        >
+                          <Star className={`h-4 w-4 ${isFavorite(channel.slug || channel.username) ? "fill-current text-[#53fc18]" : ""}`} />
+                        </button>
+                      </div>
                     ))}
+
                   </div>
                 </div>
               )}
@@ -486,9 +513,17 @@ const KickTrendingClips = () => {
               <Badge key={s.name} variant="secondary" className="text-xs flex items-center gap-1">
                 {s.avatar && <img src={s.avatar} alt="" className="w-4 h-4 rounded-full" />}
                 <span>{s.name}</span>
+                <button
+                  onClick={() => toggleFavorite(s)}
+                  className="hover:text-[#53fc18]"
+                  title={isFavorite(s.name) ? "Quitar de favoritos" : "Guardar en favoritos"}
+                >
+                  <Star className={`h-3 w-3 ${isFavorite(s.name) ? "fill-current text-[#53fc18]" : ""}`} />
+                </button>
                 <button onClick={() => removeStreamer(s.name)} className="ml-1 hover:text-destructive"><X className="h-3 w-3" /></button>
               </Badge>
             ))}
+
             <Button variant="ghost" size="sm" onClick={() => setSelectedStreamers([])}
               className="h-6 text-xs text-muted-foreground hover:text-destructive px-1"
             >Limpiar</Button>
