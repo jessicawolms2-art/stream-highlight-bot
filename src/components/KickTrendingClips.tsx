@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Gamepad2, Calendar, CheckCircle, X, Download, User, Globe } from "lucide-react";
+import { Flame, Eye, Clock, ExternalLink, Loader2, RefreshCw, Gamepad2, Calendar, CheckCircle, X, Download, User, Globe, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import MultiSelectFilter, { FilterOption } from "@/components/MultiSelectFilter";
+import FavoriteStreamersMenu from "@/components/FavoriteStreamersMenu";
+import { useFavoriteStreamers } from "@/hooks/use-favorite-streamers";
+
 
 const VIEWED_CLIPS_KEY = 'kick_viewed_clips';
 const VIEWED_CLIPS_DATA_KEY = 'kick_viewed_clips_data';
