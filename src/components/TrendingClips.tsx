@@ -527,7 +527,18 @@ const TrendingClips = () => {
           {/* Multi streamer filter */}
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
+            <FavoriteStreamersMenu
+              favorites={favorites}
+              onSelect={(fav) => {
+                if (!selectedStreamers.find(s => s.name.toLowerCase() === fav.name.toLowerCase())) {
+                  setSelectedStreamers(prev => [...prev, fav]);
+                }
+              }}
+              onRemove={removeFavorite}
+              onClear={clearFavorites}
+            />
             <div className="relative">
+
               <Input
                 ref={inputRef}
                 placeholder="Añadir streamer..."
