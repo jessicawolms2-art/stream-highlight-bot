@@ -142,6 +142,8 @@ const KickTrendingClips = () => {
   const [isSearchingChannels, setIsSearchingChannels] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { favorites, isFavorite, toggleFavorite, removeFavorite, clearFavorites } = useFavoriteStreamers('kick');
+
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
