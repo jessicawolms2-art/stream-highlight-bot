@@ -430,26 +430,36 @@ const KickTrendingClips = () => {
                 <div className="absolute top-full left-0 z-50 mt-1 w-[280px] rounded-md border bg-popover p-1 shadow-md">
                   <div className="max-h-[300px] overflow-y-auto">
                     {channelSuggestions.map((channel) => (
-                      <button
-                        key={channel.id}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => selectChannel(channel)}
-                        className="w-full flex items-center gap-3 p-2 hover:bg-accent rounded-md transition-colors text-left"
-                      >
-                        {channel.profile_pic && <img src={channel.profile_pic} alt="" className="w-8 h-8 rounded-full" />}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm truncate">{channel.username}</span>
-                            {channel.is_live && (
-                              <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">LIVE</Badge>
+                      <div key={channel.id} className="flex items-center gap-1 rounded-md hover:bg-accent">
+                        <button
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => selectChannel(channel)}
+                          className="flex flex-1 items-center gap-3 p-2 transition-colors text-left min-w-0"
+                        >
+                          {channel.profile_pic && <img src={channel.profile_pic} alt="" className="w-8 h-8 rounded-full" />}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm truncate">{channel.username}</span>
+                              {channel.is_live && (
+                                <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">LIVE</Badge>
+                              )}
+                            </div>
+                            {channel.category && (
+                              <span className="text-xs text-muted-foreground truncate block">{channel.category}</span>
                             )}
                           </div>
-                          {channel.category && (
-                            <span className="text-xs text-muted-foreground truncate block">{channel.category}</span>
-                          )}
-                        </div>
-                      </button>
+                        </button>
+                        <button
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => toggleFavorite({ name: channel.slug || channel.username, avatar: channel.profile_pic })}
+                          className="p-2 text-muted-foreground hover:text-[#53fc18]"
+                          title={isFavorite(channel.slug || channel.username) ? "Quitar de favoritos" : "Guardar en favoritos"}
+                        >
+                          <Star className={`h-4 w-4 ${isFavorite(channel.slug || channel.username) ? "fill-current text-[#53fc18]" : ""}`} />
+                        </button>
+                      </div>
                     ))}
+
                   </div>
                 </div>
               )}
