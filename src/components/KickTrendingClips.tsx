@@ -491,7 +491,17 @@ const KickTrendingClips = () => {
               <Badge key={s.name} variant="secondary" className="text-xs flex items-center gap-1">
                 {s.avatar && <img src={s.avatar} alt="" className="w-4 h-4 rounded-full" />}
                 <span>{s.name}</span>
+                <button
+                  onClick={() => toggleFavorite(s)}
+                  className="hover:text-[#53fc18]"
+                  title={isFavorite(s.name) ? "Quitar de favoritos" : "Guardar en favoritos"}
+                >
+                  <Star className={`h-3 w-3 ${isFavorite(s.name) ? "fill-current text-[#53fc18]" : ""}`} />
+                </button>
                 <button onClick={() => removeStreamer(s.name)} className="ml-1 hover:text-destructive"><X className="h-3 w-3" /></button>
+              </Badge>
+            ))}
+
               </Badge>
             ))}
             <Button variant="ghost" size="sm" onClick={() => setSelectedStreamers([])}
